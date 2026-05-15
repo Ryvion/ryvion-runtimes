@@ -1,7 +1,7 @@
 FROM python:3.11-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential cmake libgomp1 && \
+    build-essential cmake git libgomp1 && \
     rm -rf /var/lib/apt/lists/*
 
 RUN pip install --no-cache-dir llama-cpp-python==0.3.8

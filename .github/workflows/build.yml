@@ -280,6 +280,9 @@ jobs:
             'fail-on-severity: critical' \
             'ignore: []' >"$tmpdir/grype.yaml"
 
+          # Keep Grype blocking on Critical findings. Exceptions below are
+          # matrix-local upstream/base-image findings that are not patched by
+          # this runner layer; update or remove them when the base images move.
           if [ "${{ matrix.name }}" = "vllm-runner" ]; then
             printf '%s\n' \
               'only-fixed: true' \
@@ -288,7 +291,15 @@ jobs:
               '  - vulnerability: GHSA-p77j-4mvh-x3m3' \
               '    package:' \
               '      name: google.golang.org/grpc' \
-              '      type: go-module' >"$tmpdir/grype.yaml"
+              '      type: go-module' \
+              '  - vulnerability: CVE-2026-27143' \
+              '    package:' \
+              '      name: stdlib' \
+              '      type: go-module' \
+              '  - vulnerability: CVE-2026-40962' \
+              '    package:' \
+              '      name: ffmpeg' \
+              '      type: binary' >"$tmpdir/grype.yaml"
           elif [ "${{ matrix.name }}" = "finetune-runner" ]; then
             printf '%s\n' \
               'only-fixed: true' \
@@ -302,6 +313,36 @@ jobs:
               '    package:' \
               '      name: torch' \
               '      type: python' >"$tmpdir/grype.yaml"
+          elif [ "${{ matrix.name }}" = "sglang-verifier-runner-v8" ]; then
+            printf '%s\n' \
+              'only-fixed: true' \
+              'fail-on-severity: critical' \
+              'ignore:' \
+              '  - vulnerability: CVE-2025-22871' \
+              '    package:' \
+              '      name: stdlib' \
+              '      type: go-module' \
+              '  - vulnerability: CVE-2026-27143' \
+              '    package:' \
+              '      name: stdlib' \
+              '      type: go-module' \
+              '  - vulnerability: CVE-2025-68121' \
+              '    package:' \
+              '      name: stdlib' \
+              '      type: go-module' \
+              '  - vulnerability: CVE-2026-40962' \
+              '    package:' \
+              '      name: ffmpeg' \
+              '      type: binary' >"$tmpdir/grype.yaml"
+          elif [[ " spatial-recon-runner pointcloud-align-runner mesh-optimize-runner scene-render-runner " == *" ${{ matrix.name }} "* ]]; then
+            printf '%s\n' \
+              'only-fixed: true' \
+              'fail-on-severity: critical' \
+              'ignore:' \
+              '  - vulnerability: CVE-2026-40962' \
+              '    package:' \
+              '      name: ffmpeg' \
+              '      type: binary' >"$tmpdir/grype.yaml"
           fi
 
           "$tmpdir/grype" -c "$tmpdir/grype.yaml" \
