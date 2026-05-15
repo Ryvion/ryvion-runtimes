@@ -10,6 +10,8 @@ Current scope:
 - `llm-runner`
 - `transcode-runner`
 - `vllm-runner`
+- `draft-runner-v8`
+- `verifier-runner-v8-contract`
 - `whisper-runner`
 - `spatial-stage-runner` (published as `spatial-recon-runner`, `pointcloud-align-runner`, `mesh-optimize-runner`, `scene-render-runner`)
 
@@ -18,6 +20,8 @@ Runner ownership rule:
 - Runner images live in this repository.
 - `node-agent` is responsible for runtime execution, not for owning runner image definitions.
 - `vllm-runner` remains the batched large-model container family used by `hub-orch` for the GPU-heavy OpenAI-compatible model tags.
+- `draft-runner-v8` is the stateless Foresight Mesh draft generator. It emits `/work/draft_packets.json` with privacy-safe DraftPacket payloads and uses llama.cpp when a local GGUF is available, otherwise a deterministic fallback for CI and contract tests.
+- `verifier-runner-v8-contract` is the CPU mock for the long-lived verifier session contract. It listens on `/work/verifier_session.sock` and supports `start_session`, `prefill`, `verify_tree`, `commit`, `rollback`, `abort`, and `close_session`.
 - `agent-runner` is the default persistent-agent starter image used by `hub-orch` when a buyer deploys an agent without providing a custom image.
 
 Runner contract:
@@ -47,6 +51,8 @@ Compatibility:
 	- `ghcr.io/ryvion/llm-runner:0.1.0`
 	- `ghcr.io/ryvion/transcode-runner:0.1.0`
 	- `ghcr.io/ryvion/vllm-runner:{latest,deepseek-r1-671b,deepseek-v3-671b,llama-3_3-70b,qwen-2_5-72b,mistral-large-2}`
+	- `ghcr.io/ryvion/draft-runner-v8:0.1.0`
+	- `ghcr.io/ryvion/verifier-runner-v8-contract:0.1.0`
 	- `ghcr.io/ryvion/whisper-runner:0.1.0`
 	- `ghcr.io/ryvion/spatial-recon-runner:0.1.0`
 	- `ghcr.io/ryvion/pointcloud-align-runner:0.1.0`
