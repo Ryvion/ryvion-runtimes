@@ -257,6 +257,7 @@ jobs:
             "${TRIVY_IMAGE}" image \
             --scanners vuln \
             --skip-version-check \
+            --timeout 30m \
             --format table \
             --exit-code 1 \
             --ignore-unfixed \
@@ -381,6 +382,7 @@ jobs:
             "${TRIVY_IMAGE}" fs \
             --scanners vuln \
             --skip-version-check \
+            --timeout 30m \
             --format table \
             --exit-code 1 \
             --ignore-unfixed \
