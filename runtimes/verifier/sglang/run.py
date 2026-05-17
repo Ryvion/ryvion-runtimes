@@ -1,4 +1,4 @@
-"""Ryvion SGLang verifier-runner v8.
+"""Ryvion SGLang verifier runner.
 
 This runner is the first GPU data-plane implementation for the Ryvion
 VerifierSessionContract. It exposes a newline-delimited JSON-RPC service over a
@@ -631,7 +631,7 @@ class SGLangVerifierSessionServer:
             "accepted_tokens": 0,
         }
         output = {
-            "schema_version": "ryvion.sglang_verifier_runner_v8.output.v1",
+            "schema_version": "ryvion.speculative.sglang_verifier.output.v1",
             "receipt_type": receipt.get("receipt_type"),
             "accepted_len": receipt.get("accepted_len", 0),
             "tree_cid": receipt.get("tree_cid", ""),

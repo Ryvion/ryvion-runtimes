@@ -214,7 +214,7 @@ def draft_packet_signature(packet: dict) -> str:
 
 def write_outputs(job: dict, packets: list[dict], started: float) -> None:
     output = {
-        "schema_version": "ryvion.draft_runner_v8.output.v1",
+        "schema_version": "ryvion.speculative.draft_small_model.output.v1",
         "window_id": str(job.get("window_id") or ""),
         "workgraph_id": str(job.get("workgraph_id") or ""),
         "packet_count": len(packets),

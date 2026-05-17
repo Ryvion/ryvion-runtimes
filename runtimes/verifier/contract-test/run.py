@@ -1,4 +1,4 @@
-"""CPU mock for Ryvion verifier-runner v8 session contract.
+"""CPU mock for Ryvion verifier runner session contract.
 
 This runner intentionally does not implement GPU verification. It exposes a
 newline-delimited JSON-RPC server over a Unix socket so node-agent can exercise
@@ -194,7 +194,7 @@ class VerifierSessionServer:
             "accepted_tokens": 0,
         }
         output = {
-            "schema_version": "ryvion.verifier_runner_v8_contract.output.v1",
+            "schema_version": "ryvion.speculative.verifier_contract_test.output.v1",
             "receipt_type": receipt.get("receipt_type"),
             "accepted_len": receipt.get("accepted_len", 0),
             "tree_cid": receipt.get("tree_cid", ""),

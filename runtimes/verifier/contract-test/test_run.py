@@ -8,7 +8,7 @@ from pathlib import Path
 
 def load_runner():
     module_path = Path(__file__).with_name("run.py")
-    spec = importlib.util.spec_from_file_location("verifier_runner_v8_contract", module_path)
+    spec = importlib.util.spec_from_file_location("verifier_contract_test", module_path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -76,7 +76,7 @@ class VerifierRunnerV8ContractTests(unittest.TestCase):
             self.assertEqual(receipt["accepted_len"], 3)
             self.assertGreaterEqual(probe["confidence_bps"], 9000)
             self.assertEqual(metrics["output_name"], "output.json")
-            self.assertEqual(output["schema_version"], "ryvion.verifier_runner_v8_contract.output.v1")
+            self.assertEqual(output["schema_version"], "ryvion.speculative.verifier_contract_test.output.v1")
 
 
 if __name__ == "__main__":

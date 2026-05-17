@@ -9,7 +9,7 @@ from pathlib import Path
 
 def load_runner():
     module_path = Path(__file__).with_name("run.py")
-    spec = importlib.util.spec_from_file_location("sglang_verifier_runner_v8", module_path)
+    spec = importlib.util.spec_from_file_location("sglang_verifier", module_path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -68,10 +68,10 @@ class SGLangVerifierRunnerV8Tests(unittest.TestCase):
             thread.start()
             server.wait_ready(timeout_s=2)
 
-            session = {"session_id": "sess-gpu", "workgraph_id": "wg-v8", "model_hash": "sha256:model", "prefix_tokens": []}
+            session = {"session_id": "sess-gpu", "workgraph_id": "wg-speculative", "model_hash": "sha256:model", "prefix_tokens": []}
             tree = {
                 "tree_cid": "sha256:tree",
-                "window_id": "win-v8",
+                "window_id": "win-speculative",
                 "branches": [
                     {"branch_id": "br-a", "candidate_tokens": [10, 11, 99]},
                     {"branch_id": "br-b", "candidate_tokens": [10, 13]},
@@ -103,7 +103,7 @@ class SGLangVerifierRunnerV8Tests(unittest.TestCase):
             self.assertNotIn("raw_prompt", json.dumps(probe))
             self.assertEqual(metrics["output_name"], "output.json")
             self.assertEqual(metrics["engine"], "sglang")
-            self.assertEqual(output["schema_version"], "ryvion.sglang_verifier_runner_v8.output.v1")
+            self.assertEqual(output["schema_version"], "ryvion.speculative.sglang_verifier.output.v1")
 
     def test_abort_after_verify_flushes_partial_evidence_without_completed_receipt(self):
         import tempfile

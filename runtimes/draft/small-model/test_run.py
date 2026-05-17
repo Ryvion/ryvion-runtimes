@@ -6,14 +6,14 @@ from pathlib import Path
 
 def load_runner():
     module_path = Path(__file__).with_name("run.py")
-    spec = importlib.util.spec_from_file_location("draft_runner_v8", module_path)
+    spec = importlib.util.spec_from_file_location("draft_small_model", module_path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
 
 
 class DraftRunnerV8Tests(unittest.TestCase):
-    def test_build_draft_packets_are_foresight_safe_and_signed(self):
+    def test_build_draft_packets_are_speculative_safe_and_signed(self):
         runner = load_runner()
         job = {
             "window_id": "win-test",
@@ -78,7 +78,7 @@ class DraftRunnerV8Tests(unittest.TestCase):
             self.assertEqual(receipt["receipt_type"], "ryvion.draft_packet_batch.v1")
             self.assertTrue(receipt["output_hash"].startswith("sha256:"))
             self.assertEqual(metrics["output_name"], "output.json")
-            self.assertEqual(output["schema_version"], "ryvion.draft_runner_v8.output.v1")
+            self.assertEqual(output["schema_version"], "ryvion.speculative.draft_small_model.output.v1")
 
 
 if __name__ == "__main__":

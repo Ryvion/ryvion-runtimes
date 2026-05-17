@@ -53,9 +53,9 @@ Compatibility:
 	- `ghcr.io/ryvion/llm-runner:0.1.0`
 	- `ghcr.io/ryvion/transcode-runner:0.1.0`
 	- `ghcr.io/ryvion/vllm-runner:{latest,deepseek-r1-671b,deepseek-v3-671b,llama-3_3-70b,qwen-2_5-72b,mistral-large-2}`
-	- `ghcr.io/ryvion/ryvion-draft-small-model:0.1.0` (`draft-runner-v8` compatibility alias)
-	- `ghcr.io/ryvion/ryvion-verifier-contract-test:0.1.0` (`verifier-runner-v8-contract` compatibility alias)
-	- `ghcr.io/ryvion/ryvion-verifier-sglang:0.1.0` (`sglang-verifier-runner-v8` compatibility alias)
+	- `ghcr.io/ryvion/ryvion-draft-small-model:0.1.0`
+	- `ghcr.io/ryvion/ryvion-verifier-contract-test:0.1.0`
+	- `ghcr.io/ryvion/ryvion-verifier-sglang:0.1.0`
 	- `ghcr.io/ryvion/whisper-runner:0.1.0`
 	- `ghcr.io/ryvion/spatial-recon-runner:0.1.0`
 	- `ghcr.io/ryvion/pointcloud-align-runner:0.1.0`
@@ -65,7 +65,6 @@ Compatibility:
 
 Path compatibility:
 
-- Published image names now use mechanism-oriented names first: `ryvion-draft-small-model`, `ryvion-verifier-contract-test`, and `ryvion-verifier-sglang`.
-- Legacy image names remain published as compatibility aliases while hub/node assignments migrate.
+- Published image names use mechanism-oriented names: `ryvion-draft-small-model`, `ryvion-verifier-contract-test`, and `ryvion-verifier-sglang`.
 - Source paths moved under `runtimes/` so the code reads by mechanism instead of by product codename.
-- Foresight Mesh remains the product/architecture name; the runtime code is organized as speculative inference.
+- speculative inference remains the product/architecture name; the runtime code is organized as speculative inference.
