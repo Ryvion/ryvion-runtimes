@@ -61,7 +61,7 @@ jobs:
             dockerfile: ./runtimes/draft/small-model/Dockerfile
             image: ghcr.io/ryvion/ryvion-draft-small-model
             platforms: linux/amd64
-          tags: |
+            tags: |
               ghcr.io/ryvion/ryvion-draft-small-model:latest
               ghcr.io/ryvion/ryvion-draft-small-model:${{ github.sha }}
               ghcr.io/ryvion/ryvion-draft-small-model:0.1.0
@@ -70,7 +70,7 @@ jobs:
             dockerfile: ./runtimes/verifier/contract-test/Dockerfile
             image: ghcr.io/ryvion/ryvion-verifier-contract-test
             platforms: linux/amd64
-          tags: |
+            tags: |
               ghcr.io/ryvion/ryvion-verifier-contract-test:latest
               ghcr.io/ryvion/ryvion-verifier-contract-test:${{ github.sha }}
               ghcr.io/ryvion/ryvion-verifier-contract-test:0.1.0
@@ -79,7 +79,7 @@ jobs:
             dockerfile: ./runtimes/verifier/sglang/Dockerfile
             image: ghcr.io/ryvion/ryvion-verifier-sglang
             platforms: linux/amd64
-          tags: |
+            tags: |
               ghcr.io/ryvion/ryvion-verifier-sglang:latest
               ghcr.io/ryvion/ryvion-verifier-sglang:${{ github.sha }}
               ghcr.io/ryvion/ryvion-verifier-sglang:0.1.0
