@@ -1,8 +1,8 @@
-# Codex Agent Instructions — runners
+# Codex Agent Instructions — Ryvion Runtimes
 
 ## Project Context
 
-Container images for GPU/CPU workloads. Built by GitHub Actions, pushed to `ghcr.io/ryvion/*`.
+Container images and runtime adapters for GPU/CPU workloads. Built by GitHub Actions, pushed to `ghcr.io/ryvion/*`.
 
 ## Container Contract
 

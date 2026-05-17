@@ -214,7 +214,7 @@ class VerifierSessionServer:
         })
         write_json_atomic(self.work_dir / "metrics.json", {
             "output_name": "output.json",
-            "runner": "verifier-runner-v8-contract",
+            "runner": "ryvion-verifier-contract-test",
             "engine": "cpu_mock",
             "accepted_len": int(receipt.get("accepted_len") or 0),
             "duration_ms": 1,

@@ -112,7 +112,7 @@ def validate_model_artifact_policy(model_path: Path) -> dict:
     elif model_path.suffix in (".bin", ".pt", ".pth", ".gguf", ".ckpt"):
         forbidden.append(model_path)
     if forbidden:
-        raise ValueError("non-safetensors weight formats are forbidden for sglang-verifier-runner-v8")
+        raise ValueError("non-safetensors weight formats are forbidden for ryvion-verifier-sglang")
     return {
         "format": "safetensors",
         "safetensors_files": len(safetensors),
@@ -654,7 +654,7 @@ class SGLangVerifierSessionServer:
         duration_ms = int((time.time() - self.started_at) * 1000)
         write_json_atomic(self.work_dir / "metrics.json", {
             "output_name": "output.json",
-            "runner": "sglang-verifier-runner-v8",
+            "runner": "ryvion-verifier-sglang",
             "engine": "sglang",
             "accepted_len": int(receipt.get("accepted_len") or 0),
             "duration_ms": duration_ms,
@@ -698,7 +698,7 @@ class SGLangVerifierSessionServer:
         write_json_atomic(self.work_dir / "probe_summary.partial.json", probe_partial)
         write_json_atomic(self.work_dir / "metrics.partial.json", {
             "output_name": "output.json",
-            "runner": "sglang-verifier-runner-v8",
+            "runner": "ryvion-verifier-sglang",
             "engine": "sglang",
             "status": "aborted",
             "accepted_len": accepted_value,

@@ -56,30 +56,39 @@ jobs:
               ghcr.io/ryvion/vllm-runner:llama-3_3-70b
               ghcr.io/ryvion/vllm-runner:qwen-2_5-72b
               ghcr.io/ryvion/vllm-runner:mistral-large-2
-          - name: draft-runner-v8
-            context: ./draft-runner-v8
-            dockerfile: ./draft-runner-v8/Dockerfile
-            image: ghcr.io/ryvion/draft-runner-v8
+          - name: ryvion-draft-small-model
+            context: ./runtimes/draft/small-model
+            dockerfile: ./runtimes/draft/small-model/Dockerfile
+            image: ghcr.io/ryvion/ryvion-draft-small-model
             platforms: linux/amd64
             tags: |
+              ghcr.io/ryvion/ryvion-draft-small-model:latest
+              ghcr.io/ryvion/ryvion-draft-small-model:${{ github.sha }}
+              ghcr.io/ryvion/ryvion-draft-small-model:0.1.0
               ghcr.io/ryvion/draft-runner-v8:latest
               ghcr.io/ryvion/draft-runner-v8:${{ github.sha }}
               ghcr.io/ryvion/draft-runner-v8:0.1.0
-          - name: verifier-runner-v8-contract
-            context: ./verifier-runner-v8-contract
-            dockerfile: ./verifier-runner-v8-contract/Dockerfile
-            image: ghcr.io/ryvion/verifier-runner-v8-contract
+          - name: ryvion-verifier-contract-test
+            context: ./runtimes/verifier/contract-test
+            dockerfile: ./runtimes/verifier/contract-test/Dockerfile
+            image: ghcr.io/ryvion/ryvion-verifier-contract-test
             platforms: linux/amd64
             tags: |
+              ghcr.io/ryvion/ryvion-verifier-contract-test:latest
+              ghcr.io/ryvion/ryvion-verifier-contract-test:${{ github.sha }}
+              ghcr.io/ryvion/ryvion-verifier-contract-test:0.1.0
               ghcr.io/ryvion/verifier-runner-v8-contract:latest
               ghcr.io/ryvion/verifier-runner-v8-contract:${{ github.sha }}
               ghcr.io/ryvion/verifier-runner-v8-contract:0.1.0
-          - name: sglang-verifier-runner-v8
-            context: ./sglang-verifier-runner-v8
-            dockerfile: ./sglang-verifier-runner-v8/Dockerfile
-            image: ghcr.io/ryvion/sglang-verifier-runner-v8
+          - name: ryvion-verifier-sglang
+            context: ./runtimes/verifier/sglang
+            dockerfile: ./runtimes/verifier/sglang/Dockerfile
+            image: ghcr.io/ryvion/ryvion-verifier-sglang
             platforms: linux/amd64
             tags: |
+              ghcr.io/ryvion/ryvion-verifier-sglang:latest
+              ghcr.io/ryvion/ryvion-verifier-sglang:${{ github.sha }}
+              ghcr.io/ryvion/ryvion-verifier-sglang:0.1.0
               ghcr.io/ryvion/sglang-verifier-runner-v8:latest
               ghcr.io/ryvion/sglang-verifier-runner-v8:${{ github.sha }}
               ghcr.io/ryvion/sglang-verifier-runner-v8:0.1.0
@@ -186,7 +195,7 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Free disk space for heavyweight images
-        if: contains(fromJSON('["vllm-runner","sglang-verifier-runner-v8","image-gen-runner","whisper-runner","model-runner","finetune-runner","bitnet-runner"]'), matrix.name)
+        if: contains(fromJSON('["vllm-runner","ryvion-verifier-sglang","image-gen-runner","whisper-runner","model-runner","finetune-runner","bitnet-runner"]'), matrix.name)
         run: |
           echo "Before cleanup:"
           df -h
@@ -220,7 +229,7 @@ jobs:
           tags: ${{ matrix.image }}:${{ github.sha }}
 
       - name: Free disk space before scanning heavyweight images
-        if: github.event_name != 'pull_request' && contains(fromJSON('["vllm-runner","sglang-verifier-runner-v8","image-gen-runner","whisper-runner","model-runner","finetune-runner","bitnet-runner"]'), matrix.name)
+        if: github.event_name != 'pull_request' && contains(fromJSON('["vllm-runner","ryvion-verifier-sglang","image-gen-runner","whisper-runner","model-runner","finetune-runner","bitnet-runner"]'), matrix.name)
         run: |
           echo "Before scan cleanup:"
           df -h
@@ -313,7 +322,7 @@ jobs:
               '    package:' \
               '      name: torch' \
               '      type: python' >"$tmpdir/grype.yaml"
-          elif [ "${{ matrix.name }}" = "sglang-verifier-runner-v8" ]; then
+          elif [ "${{ matrix.name }}" = "ryvion-verifier-sglang" ]; then
             printf '%s\n' \
               'only-fixed: true' \
               'fail-on-severity: critical' \
@@ -427,18 +436,18 @@ jobs:
         run: python -m py_compile spatial-stage-runner/run.py
       - name: Check vllm-runner syntax
         run: python -m py_compile vllm-runner/run.py
-      - name: Check draft-runner-v8 syntax
-        run: python -m py_compile draft-runner-v8/run.py
-      - name: Check verifier-runner-v8-contract syntax
-        run: python -m py_compile verifier-runner-v8-contract/run.py
-      - name: Check sglang-verifier-runner-v8 syntax
-        run: python -m py_compile sglang-verifier-runner-v8/run.py
-      - name: Test draft-runner-v8 contract
-        run: python -m unittest discover draft-runner-v8 -v
-      - name: Test verifier-runner-v8-contract RPC
-        run: python -m unittest discover verifier-runner-v8-contract -v
-      - name: Test sglang-verifier-runner-v8 contract
-        run: python -m unittest discover sglang-verifier-runner-v8 -v
+      - name: Check ryvion-draft-small-model syntax
+        run: python -m py_compile runtimes/draft/small-model/run.py
+      - name: Check ryvion-verifier-contract-test syntax
+        run: python -m py_compile runtimes/verifier/contract-test/run.py
+      - name: Check ryvion-verifier-sglang syntax
+        run: python -m py_compile runtimes/verifier/sglang/run.py
+      - name: Test ryvion-draft-small-model contract
+        run: python -m unittest discover runtimes/draft/small-model -v
+      - name: Test ryvion-verifier-contract-test RPC
+        run: python -m unittest discover runtimes/verifier/contract-test -v
+      - name: Test ryvion-verifier-sglang contract
+        run: python -m unittest discover runtimes/verifier/sglang -v
       - name: Check image-gen-runner syntax
         run: python -m py_compile image-gen-runner/run.py
       - name: Check whisper-runner syntax

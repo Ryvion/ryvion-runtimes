@@ -1,7 +1,7 @@
-"""Ryvion Foresight Mesh draft runner v8.
+"""Ryvion speculative draft runtime.
 
 Reads /work/job.json and emits privacy-safe DraftPacket payloads for the
-hub-relayed Foresight Mesh proposal window. The runner is stateless: it does
+hub-relayed speculative proposal window. The runner is stateless: it does
 not own KV cache and never writes raw prompt/output text into packet payloads.
 """
 
@@ -19,7 +19,7 @@ from typing import Iterable
 WORK_DIR = Path(os.environ.get("RYV_WORK_DIR", "/work"))
 MODEL_DIR = Path(os.environ.get("RYV_MODEL_DIR", "/models"))
 DEFAULT_MODEL_FILE = os.environ.get("RYV_MODEL_FILE", "").strip()
-DEFAULT_DRAFTER_ID = os.environ.get("RYV_DRAFTER_MODEL_ID", "draft-runner-v8")
+DEFAULT_DRAFTER_ID = os.environ.get("RYV_DRAFTER_MODEL_ID", "ryvion-draft-small-model")
 DEFAULT_MODEL_HASH = os.environ.get("RYV_MODEL_HASH", "sha256:local-draft-model")
 MAX_CONTEXT = int(os.environ.get("RYV_CTX_SIZE", "2048"))
 N_THREADS = int(os.environ.get("RYV_THREADS", "4"))
@@ -234,7 +234,7 @@ def write_outputs(job: dict, packets: list[dict], started: float) -> None:
     })
     write_json_atomic(WORK_DIR / "metrics.json", {
         "output_name": "output.json",
-        "runner": "draft-runner-v8",
+        "runner": "ryvion-draft-small-model",
         "engine": "llama_cpp_or_deterministic_fallback",
         "duration_ms": int((time.time() - started) * 1000),
         "packet_count": len(packets),
@@ -284,7 +284,7 @@ def main() -> int:
         })
         write_json_atomic(WORK_DIR / "metrics.json", {
             "output_name": "output.json",
-            "runner": "draft-runner-v8",
+            "runner": "ryvion-draft-small-model",
             "duration_ms": int((time.time() - started) * 1000),
             "error_code": "draft_runner_failed",
         })
