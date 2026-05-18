@@ -17,23 +17,40 @@ env:
   GRYPE_VERSION: 0.110.0
 
 jobs:
+  validate:
+    name: Validate active runners
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.x'
+          cache: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Check blender-runner syntax
+        run: python -m py_compile blender-runner/run.py
+      - name: Vet transcode-runner
+        run: cd transcode-runner && go vet ./...
+
   build:
     name: Build ${{ matrix.name }}
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 90
+    needs: validate
     strategy:
       fail-fast: false
       matrix:
         include:
-          - name: embed-runner
-            context: ./embed-runner
-            dockerfile: ./embed-runner/Dockerfile
-            image: ghcr.io/ryvion/embed-runner
+          - name: blender-runner
+            context: ./blender-runner
+            dockerfile: ./blender-runner/Dockerfile
+            image: ghcr.io/ryvion/blender-runner
             platforms: linux/amd64
             tags: |
-              ghcr.io/ryvion/embed-runner:latest
-              ghcr.io/ryvion/embed-runner:${{ github.sha }}
-              ghcr.io/ryvion/embed-runner:0.1.0
+              ghcr.io/ryvion/blender-runner:latest
+              ghcr.io/ryvion/blender-runner:${{ github.sha }}
           - name: transcode-runner
             context: ./transcode-runner
             dockerfile: ./transcode-runner/Dockerfile
@@ -42,161 +59,12 @@ jobs:
             tags: |
               ghcr.io/ryvion/transcode-runner:latest
               ghcr.io/ryvion/transcode-runner:${{ github.sha }}
-              ghcr.io/ryvion/transcode-runner:0.1.0
-          - name: vllm-runner
-            context: ./vllm-runner
-            dockerfile: ./vllm-runner/Dockerfile
-            image: ghcr.io/ryvion/vllm-runner
-            platforms: linux/amd64
-            tags: |
-              ghcr.io/ryvion/vllm-runner:latest
-              ghcr.io/ryvion/vllm-runner:${{ github.sha }}
-              ghcr.io/ryvion/vllm-runner:deepseek-r1-671b
-              ghcr.io/ryvion/vllm-runner:deepseek-v3-671b
-              ghcr.io/ryvion/vllm-runner:llama-3_3-70b
-              ghcr.io/ryvion/vllm-runner:qwen-2_5-72b
-              ghcr.io/ryvion/vllm-runner:mistral-large-2
-          - name: ryvion-draft-small-model
-            context: ./runtimes/draft/small-model
-            dockerfile: ./runtimes/draft/small-model/Dockerfile
-            image: ghcr.io/ryvion/ryvion-draft-small-model
-            platforms: linux/amd64
-            tags: |
-              ghcr.io/ryvion/ryvion-draft-small-model:latest
-              ghcr.io/ryvion/ryvion-draft-small-model:${{ github.sha }}
-              ghcr.io/ryvion/ryvion-draft-small-model:0.1.0
-          - name: ryvion-verifier-contract-test
-            context: ./runtimes/verifier/contract-test
-            dockerfile: ./runtimes/verifier/contract-test/Dockerfile
-            image: ghcr.io/ryvion/ryvion-verifier-contract-test
-            platforms: linux/amd64
-            tags: |
-              ghcr.io/ryvion/ryvion-verifier-contract-test:latest
-              ghcr.io/ryvion/ryvion-verifier-contract-test:${{ github.sha }}
-              ghcr.io/ryvion/ryvion-verifier-contract-test:0.1.0
-          - name: ryvion-verifier-sglang
-            context: ./runtimes/verifier/sglang
-            dockerfile: ./runtimes/verifier/sglang/Dockerfile
-            image: ghcr.io/ryvion/ryvion-verifier-sglang
-            platforms: linux/amd64
-            tags: |
-              ghcr.io/ryvion/ryvion-verifier-sglang:latest
-              ghcr.io/ryvion/ryvion-verifier-sglang:${{ github.sha }}
-              ghcr.io/ryvion/ryvion-verifier-sglang:0.1.0
-          - name: spatial-recon-runner
-            context: ./spatial-stage-runner
-            dockerfile: ./spatial-stage-runner/Dockerfile
-            image: ghcr.io/ryvion/spatial-recon-runner
-            build_args: STAGE_KIND=spatial_recon
-            platforms: linux/amd64
-            tags: |
-              ghcr.io/ryvion/spatial-recon-runner:latest
-              ghcr.io/ryvion/spatial-recon-runner:${{ github.sha }}
-              ghcr.io/ryvion/spatial-recon-runner:0.1.0
-          - name: pointcloud-align-runner
-            context: ./spatial-stage-runner
-            dockerfile: ./spatial-stage-runner/Dockerfile
-            image: ghcr.io/ryvion/pointcloud-align-runner
-            build_args: STAGE_KIND=pointcloud_align
-            platforms: linux/amd64
-            tags: |
-              ghcr.io/ryvion/pointcloud-align-runner:latest
-              ghcr.io/ryvion/pointcloud-align-runner:${{ github.sha }}
-              ghcr.io/ryvion/pointcloud-align-runner:0.1.0
-          - name: mesh-optimize-runner
-            context: ./spatial-stage-runner
-            dockerfile: ./spatial-stage-runner/Dockerfile
-            image: ghcr.io/ryvion/mesh-optimize-runner
-            build_args: STAGE_KIND=mesh_optimize
-            platforms: linux/amd64
-            tags: |
-              ghcr.io/ryvion/mesh-optimize-runner:latest
-              ghcr.io/ryvion/mesh-optimize-runner:${{ github.sha }}
-              ghcr.io/ryvion/mesh-optimize-runner:0.1.0
-          - name: scene-render-runner
-            context: ./spatial-stage-runner
-            dockerfile: ./spatial-stage-runner/Dockerfile
-            image: ghcr.io/ryvion/scene-render-runner
-            build_args: STAGE_KIND=scene_render
-            platforms: linux/amd64
-            tags: |
-              ghcr.io/ryvion/scene-render-runner:latest
-              ghcr.io/ryvion/scene-render-runner:${{ github.sha }}
-              ghcr.io/ryvion/scene-render-runner:0.1.0
-          - name: image-gen-runner
-            context: ./image-gen-runner
-            dockerfile: ./image-gen-runner/Dockerfile
-            image: ghcr.io/ryvion/image-gen-runner
-            platforms: linux/amd64
-            tags: |
-              ghcr.io/ryvion/image-gen-runner:latest
-              ghcr.io/ryvion/image-gen-runner:${{ github.sha }}
-              ghcr.io/ryvion/image-gen-runner:0.1.0
-          - name: whisper-runner
-            context: ./whisper-runner
-            dockerfile: ./whisper-runner/Dockerfile
-            image: ghcr.io/ryvion/whisper-runner
-            platforms: linux/amd64
-            tags: |
-              ghcr.io/ryvion/whisper-runner:latest
-              ghcr.io/ryvion/whisper-runner:${{ github.sha }}
-              ghcr.io/ryvion/whisper-runner:0.1.0
-          - name: model-runner
-            context: ./model-runner
-            dockerfile: ./model-runner/Dockerfile
-            image: ghcr.io/ryvion/model-runner
-            platforms: linux/amd64
-            tags: |
-              ghcr.io/ryvion/model-runner:latest
-              ghcr.io/ryvion/model-runner:${{ github.sha }}
-              ghcr.io/ryvion/model-runner:0.1.0
-          - name: finetune-runner
-            context: ./finetune-runner
-            dockerfile: ./finetune-runner/Dockerfile
-            image: ghcr.io/ryvion/finetune-runner
-            platforms: linux/amd64
-            tags: |
-              ghcr.io/ryvion/finetune-runner:latest
-              ghcr.io/ryvion/finetune-runner:${{ github.sha }}
-              ghcr.io/ryvion/finetune-runner:0.1.0
-              ghcr.io/ryvion/finetune-runner:0.1.1
-          - name: agent-runner
-            context: ./agent-runner
-            dockerfile: ./agent-runner/Dockerfile
-            image: ghcr.io/ryvion/agent-runner
-            platforms: linux/amd64,linux/arm64
-            tags: |
-              ghcr.io/ryvion/agent-runner:latest
-              ghcr.io/ryvion/agent-runner:${{ github.sha }}
-              ghcr.io/ryvion/agent-runner:0.1.0
-              ghcr.io/ryvion/agent-runner:0.1.1
-          - name: bitnet-runner
-            context: ./bitnet-runner
-            dockerfile: ./bitnet-runner/Dockerfile
-            image: ghcr.io/ryvion/bitnet-runner
-            platforms: linux/amd64
-            tags: |
-              ghcr.io/ryvion/bitnet-runner:latest
-              ghcr.io/ryvion/bitnet-runner:${{ github.sha }}
-              ghcr.io/ryvion/bitnet-runner:0.1.0
+
     steps:
       - uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-
-      - name: Free disk space for heavyweight images
-        if: contains(fromJSON('["vllm-runner","ryvion-verifier-sglang","image-gen-runner","whisper-runner","model-runner","finetune-runner","bitnet-runner"]'), matrix.name)
-        run: |
-          echo "Before cleanup:"
-          df -h
-          sudo rm -rf /usr/local/lib/android || true
-          sudo rm -rf /usr/share/dotnet || true
-          sudo rm -rf /opt/ghc || true
-          sudo rm -rf /opt/hostedtoolcache/CodeQL || true
-          docker system prune -af || true
-          echo "After cleanup:"
-          df -h
 
       - name: Login to GHCR
         if: github.event_name != 'pull_request'
@@ -219,41 +87,16 @@ jobs:
           sbom: true
           tags: ${{ matrix.image }}:${{ github.sha }}
 
-      - name: Free disk space before scanning heavyweight images
-        if: github.event_name != 'pull_request' && contains(fromJSON('["vllm-runner","ryvion-verifier-sglang","image-gen-runner","whisper-runner","model-runner","finetune-runner","bitnet-runner"]'), matrix.name)
-        run: |
-          echo "Before scan cleanup:"
-          df -h
-          docker buildx prune -af || true
-          docker system prune -af || true
-          echo "After scan cleanup:"
-          df -h
-
       - name: Run Trivy vulnerability scanner on image
         if: github.event_name != 'pull_request'
         run: |
           export TRIVY_USERNAME="${{ github.actor }}"
           export TRIVY_PASSWORD="${{ secrets.GITHUB_TOKEN }}"
-          sudo mkdir -p /mnt/trivy-tmp
-          sudo chown "$(id -u):$(id -g)" /mnt/trivy-tmp
-          tmpdir="$(mktemp -d)"
-          trivy_tmpdir="$(mktemp -d /mnt/trivy-tmp/trivy.XXXXXX)"
-          trap 'rm -rf "$tmpdir" "$trivy_tmpdir"' EXIT
           mkdir -p "${{ github.workspace }}/.cache/trivy"
-          volume_args=(
-            -v "${{ github.workspace }}/.cache/trivy:/root/.cache/"
-            -v "$trivy_tmpdir:/tmp"
-            -e TRIVY_USERNAME
-            -e TRIVY_PASSWORD
-          )
-          ignore_args=()
-          if [ "${{ matrix.name }}" = "finetune-runner" ]; then
-            printf '%s\n' 'CVE-2025-32434' >"$tmpdir/trivy.ignore"
-            volume_args+=(-v "$tmpdir:/scan")
-            ignore_args=(--ignorefile /scan/trivy.ignore)
-          fi
           docker run --rm \
-            "${volume_args[@]}" \
+            -v "${{ github.workspace }}/.cache/trivy:/root/.cache/" \
+            -e TRIVY_USERNAME \
+            -e TRIVY_PASSWORD \
             "${TRIVY_IMAGE}" image \
             --scanners vuln \
             --skip-version-check \
@@ -263,7 +106,6 @@ jobs:
             --ignore-unfixed \
             --pkg-types os,library \
             --severity CRITICAL \
-            "${ignore_args[@]}" \
             "${{ matrix.image }}:${{ github.sha }}"
 
       - name: Run Grype vulnerability scanner on image
@@ -280,71 +122,6 @@ jobs:
             'only-fixed: true' \
             'fail-on-severity: critical' \
             'ignore: []' >"$tmpdir/grype.yaml"
-
-          # Keep Grype blocking on Critical findings. Exceptions below are
-          # matrix-local upstream/base-image findings that are not patched by
-          # this runner layer; update or remove them when the base images move.
-          if [ "${{ matrix.name }}" = "vllm-runner" ]; then
-            printf '%s\n' \
-              'only-fixed: true' \
-              'fail-on-severity: critical' \
-              'ignore:' \
-              '  - vulnerability: GHSA-p77j-4mvh-x3m3' \
-              '    package:' \
-              '      name: google.golang.org/grpc' \
-              '      type: go-module' \
-              '  - vulnerability: CVE-2026-27143' \
-              '    package:' \
-              '      name: stdlib' \
-              '      type: go-module' \
-              '  - vulnerability: CVE-2026-40962' \
-              '    package:' \
-              '      name: ffmpeg' \
-              '      type: binary' >"$tmpdir/grype.yaml"
-          elif [ "${{ matrix.name }}" = "finetune-runner" ]; then
-            printf '%s\n' \
-              'only-fixed: true' \
-              'fail-on-severity: critical' \
-              'ignore:' \
-              '  - vulnerability: CVE-2025-32434' \
-              '    package:' \
-              '      name: torch' \
-              '      type: python' \
-              '  - vulnerability: GHSA-53q9-r3pm-6pq6' \
-              '    package:' \
-              '      name: torch' \
-              '      type: python' >"$tmpdir/grype.yaml"
-          elif [ "${{ matrix.name }}" = "ryvion-verifier-sglang" ]; then
-            printf '%s\n' \
-              'only-fixed: true' \
-              'fail-on-severity: critical' \
-              'ignore:' \
-              '  - vulnerability: CVE-2025-22871' \
-              '    package:' \
-              '      name: stdlib' \
-              '      type: go-module' \
-              '  - vulnerability: CVE-2026-27143' \
-              '    package:' \
-              '      name: stdlib' \
-              '      type: go-module' \
-              '  - vulnerability: CVE-2025-68121' \
-              '    package:' \
-              '      name: stdlib' \
-              '      type: go-module' \
-              '  - vulnerability: CVE-2026-40962' \
-              '    package:' \
-              '      name: ffmpeg' \
-              '      type: binary' >"$tmpdir/grype.yaml"
-          elif [[ " spatial-recon-runner pointcloud-align-runner mesh-optimize-runner scene-render-runner " == *" ${{ matrix.name }} "* ]]; then
-            printf '%s\n' \
-              'only-fixed: true' \
-              'fail-on-severity: critical' \
-              'ignore:' \
-              '  - vulnerability: CVE-2026-40962' \
-              '    package:' \
-              '      name: ffmpeg' \
-              '      type: binary' >"$tmpdir/grype.yaml"
-          fi
 
           "$tmpdir/grype" -c "$tmpdir/grype.yaml" \
             "registry:${{ matrix.image }}:${{ github.sha }}" \
@@ -411,43 +188,3 @@ jobs:
         env:
           DIGEST: ${{ steps.build.outputs.digest }}
         run: cosign sign --yes "${{ matrix.image }}@${DIGEST}"
-
-  go-lint:
-    name: Lint runners
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version: '1.24.x'
-          cache: false
-      - name: Vet embed-runner
-        run: cd embed-runner && go vet ./...
-      - name: Vet transcode-runner
-        run: cd transcode-runner && go vet ./...
-      - name: Check spatial-stage-runner syntax
-        run: python -m py_compile spatial-stage-runner/run.py
-      - name: Check vllm-runner syntax
-        run: python -m py_compile vllm-runner/run.py
-      - name: Check ryvion-draft-small-model syntax
-        run: python -m py_compile runtimes/draft/small-model/run.py
-      - name: Check ryvion-verifier-contract-test syntax
-        run: python -m py_compile runtimes/verifier/contract-test/run.py
-      - name: Check ryvion-verifier-sglang syntax
-        run: python -m py_compile runtimes/verifier/sglang/run.py
-      - name: Test ryvion-draft-small-model contract
-        run: python -m unittest discover runtimes/draft/small-model -v
-      - name: Test ryvion-verifier-contract-test RPC
-        run: python -m unittest discover runtimes/verifier/contract-test -v
-      - name: Test ryvion-verifier-sglang contract
-        run: python -m unittest discover runtimes/verifier/sglang -v
-      - name: Check image-gen-runner syntax
-        run: python -m py_compile image-gen-runner/run.py
-      - name: Check whisper-runner syntax
-        run: python -m py_compile whisper-runner/run.py
-      - name: Check model-runner syntax
-        run: python -m py_compile model-runner/run.py
-      - name: Check finetune-runner syntax
-        run: python -m py_compile finetune-runner/train.py
-      - name: Check agent-runner syntax
-        run: python -m py_compile agent-runner/run.py

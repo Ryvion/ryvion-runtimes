@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -17,8 +16,6 @@ import (
 )
 
 type JobSpec struct {
-	PayloadURL string   `json:"payload_url"`
-	InputURL   string   `json:"input_url"`
 	InputFile  string   `json:"input_file"`
 	OutputFile string   `json:"output_file"`
 	Args       []string `json:"args"`
@@ -54,7 +51,7 @@ type ffprobeFormat struct {
 func main() {
 	js := loadJob()
 	inputPath, outputPath := resolvePaths(js)
-	prepareInput(js, inputPath)
+	requireInput(inputPath)
 
 	args := buildArgs(js, inputPath, outputPath)
 	start := time.Now()
@@ -100,44 +97,33 @@ func loadJob() JobSpec {
 }
 
 func resolvePaths(js JobSpec) (string, string) {
-	inputPath := strings.TrimSpace(js.InputFile)
-	if inputPath == "" {
-		inputPath = "/work/input"
-	}
-	outputPath := strings.TrimSpace(js.OutputFile)
-	if outputPath == "" {
-		outputPath = "/work/output"
+	inputPath := safeWorkPath(js.InputFile, "/work/input")
+	outputPath := safeWorkPath(js.OutputFile, "/work/output/output.mp4")
+	if err := os.MkdirAll(filepath.Dir(outputPath), 0o755); err != nil {
+		log.Fatalf("create output directory: %v", err)
 	}
 	return inputPath, outputPath
 }
 
-func prepareInput(js JobSpec, inputPath string) {
-	src := strings.TrimSpace(js.PayloadURL)
-	if src == "" {
-		src = strings.TrimSpace(js.InputURL)
+func safeWorkPath(value, fallback string) string {
+	raw := strings.TrimSpace(value)
+	if raw == "" {
+		raw = fallback
 	}
-	if src == "" {
-		if _, err := os.Stat(inputPath); err != nil {
-			log.Fatalf("no payload provided and input file missing: %v", err)
-		}
-		return
+	if !filepath.IsAbs(raw) {
+		raw = filepath.Join("/work", raw)
 	}
-	client := &http.Client{Timeout: 10 * time.Minute}
-	resp, err := client.Get(src)
-	if err != nil {
-		log.Fatalf("download payload: %v", err)
+	clean := filepath.Clean(raw)
+	rel, err := filepath.Rel("/work", clean)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, "../") || filepath.IsAbs(rel) {
+		log.Fatalf("path escapes /work: %s", value)
 	}
-	defer resp.Body.Close()
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		log.Fatalf("download payload: unexpected status %s", resp.Status)
-	}
-	out, err := os.Create(inputPath)
-	if err != nil {
-		log.Fatalf("create input file: %v", err)
-	}
-	defer out.Close()
-	if _, err := io.Copy(out, resp.Body); err != nil {
-		log.Fatalf("copy payload: %v", err)
+	return clean
+}
+
+func requireInput(inputPath string) {
+	if _, err := os.Stat(inputPath); err != nil {
+		log.Fatalf("input file missing: %v", err)
 	}
 }
 
