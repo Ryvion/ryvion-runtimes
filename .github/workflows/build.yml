@@ -82,7 +82,6 @@ jobs:
           file: ${{ matrix.dockerfile }}
           platforms: ${{ matrix.platforms }}
           push: ${{ github.event_name != 'pull_request' }}
-          build-args: ${{ matrix.build_args }}
           provenance: true
           sbom: true
           tags: ${{ matrix.image }}:${{ github.sha }}
