@@ -1,70 +1,53 @@
 # Runners
 
-Container images for GPU workloads. Built by GitHub Actions, pushed to `ghcr.io/ryvion/*`.
+Container images for Ryvion render/media workloads. Built by GitHub Actions and pushed to `ghcr.io/ryvion/*`.
 
 ## Build & CI
 
-`.github/workflows/build.yml` — matrix build for all runners on push to main or version tags. Pushes `:latest`, `:SHA`, and version tags.
+`.github/workflows/build.yml` validates and builds only the active runners:
 
-No local test suite. Verify with `docker build` and `pip list` (not Python imports — GPU imports fail without GPU).
+- `blender-runner`
+- `transcode-runner`
+
+Pushes publish `:latest` and `:${SHA}` tags after image build, vulnerability scan, and signing.
+
+Local validation:
+
+- `python -m py_compile blender-runner/run.py`
+- `cd transcode-runner && go test ./... && go vet ./... && go build ./...`
 
 ## Container Contract
 
-All containers:
-1. Read `/work/job.json` (written by node-agent)
-2. Write `/work/receipt.json` (output hash + metadata)
-3. Write `/work/metrics.json` (must include `output_name` field so node-agent finds the artifact)
-4. Write output artifact to `/work/`
+All active containers:
+
+1. Read `/work/job.json` written by `ryvion-node`.
+2. Use inputs already staged under `/work`.
+3. Write output artifacts under `/work/`.
+4. Write `/work/receipt.json`.
+5. Write `/work/metrics.json` with an `output_name` field so `ryvion-node` can find the artifact.
 
 ## Network Policy
 
-- ALL containers run with `--network=none` (no internet access)
-- EXCEPT `finetune-runner` which gets `--network=bridge` (needs HuggingFace downloads)
-- Node-agent prefetches input files (`training_data_url`, `audio_url`, `model_url`, `payload_url`, `input_url`) into `/work/` before container start
+- Active runners should assume `--network=none`.
+- `ryvion-node` is responsible for staging input files before container start.
+- Do not add runner-side downloads unless the control-plane contract explicitly changes.
 
-## Runners
+## Active Runners
 
-### finetune-runner
-LoRA fine-tuning with QLoRA 4-bit quantization. CUDA 12.4 base image.
+### blender-runner
 
-Stack: torch 2.5.1, transformers 4.47.1, peft 0.14.0, trl 0.13.0, bitsandbytes 0.45.0, accelerate 1.2.1.
-
-Flow: load base model in 4-bit → train with SFTTrainer + LoRA → save adapter → reload base in fp16 on CPU → merge adapter → convert to GGUF via llama.cpp `convert_hf_to_gguf.py`. Falls back to safetensors zip if GGUF conversion fails.
-
-Training API: `SFTConfig` (not TrainingArguments), `peft_config` param on SFTTrainer, `processing_class` (not tokenizer), `dataset_text_field` in SFTConfig (not SFTTrainer constructor).
-
-Has `Dockerfile.rocm` variant for AMD GPUs.
-
-### image-gen-runner
-SDXL Turbo pre-baked in Docker image. `TRANSFORMERS_OFFLINE=1`. Max 512x512 for Turbo (OOM risk above). Outputs `/work/output.png`.
-
-### whisper-runner
-Whisper base+small models pre-baked. Looks for `/work/input_audio` (prefetched by node-agent from `audio_url`). Outputs `/work/output.json`.
-
-### model-runner
-Custom model inference. Supports GGUF (llama-cpp-python), ONNX (onnxruntime), PyTorch/SafeTensors (transformers), and custom Python scripts. Checks `/work/model.bin` (prefetched by node-agent from `model_url`) before attempting download.
-
-### llm-runner
-TinyLlama 1.1B pre-baked. Uses llama-cpp-python. For non-streaming inference (containerized). Streaming inference uses native llama-server on the node instead.
-
-### embed-runner
-Embedding generation. Pushed to `ghcr.io/ryvion/embed-runner`.
+Runs Blender scene renders from staged scene/assets. It writes render output files plus receipt and metrics documents.
 
 ### transcode-runner
-Media transcoding. Multi-arch: `linux/amd64,linux/arm64`.
 
-### vllm-runner
-vLLM-based inference for large models. Tagged per model: `:deepseek-r1-671b`, `:deepseek-v3-671b`, `:llama-3_3-70b`, `:qwen-2_5-72b`, `:mistral-large-2`.
+Runs media transcode/post-processing work. It is built for `linux/amd64` and `linux/arm64`.
 
-### spatial-stage-runner
-Spatial reconstruction pipeline. Build arg `STAGE_KIND` selects the stage.
+## Archived Directions
+
+AI inference, embedding, image generation, whisper, fine-tuning, vLLM, verifier, agent-hosting, and spatial/reality experiment runners are not active in this repository. Keep those directions in `ryvion-archive`; do not import from the archive or re-add them to the active build matrix.
 
 ## Common Gotchas
 
-- NEVER install packages that override pinned torch version (use `--no-deps` for gguf)
-- unsloth is incompatible with stable PyTorch (torchao issues) — use standard transformers+peft+trl instead (unsloth is in requirements.txt but not used in train.py)
-- bitsandbytes 4-bit models can't be `.to(fp16)` — must save adapter, reload base in fp16 on CPU, then merge
-- GPU imports fail in CI (no GPU) — verify with `pip list`, not Python imports
-- SFTTrainer API: use `SFTConfig` (not `TrainingArguments`), `peft_config` param, `processing_class` (not `tokenizer`), `dataset_text_field` in SFTConfig (not SFTTrainer constructor)
-- All runners use signal handlers for SIGTERM (exit 143) — containers get graceful shutdown
-- `metrics.json` must have `output_name` field or node-agent won't find the artifact
+- `metrics.json` must include `output_name`; otherwise `ryvion-node` will not locate the artifact.
+- Runner code must keep signal handling graceful enough for abort/failure semantics.
+- Keep runners workload-specific and small. Shared orchestration belongs in `ryvion-hub` or `ryvion-node`, not in runner images.
