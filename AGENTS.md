@@ -2,15 +2,17 @@
 
 ## Project Context
 
-Container images and runtime adapters for Ryvion render-farm workloads. Built by GitHub Actions, pushed to `ghcr.io/ryvion/*`.
+Contract placeholder for future trusted managed OCI runners. The active
+llama.cpp inference path lives in `ryvion-node`, not in this repo.
 
 ## Container Contract
 
-Active containers:
-1. Read `/work/job.json`
-2. Write `/work/receipt.json` (output hash + metadata)
-3. Write `/work/metrics.json` (must include `output_name`)
-4. Write output artifacts under `/work/`
+Future containers must:
+
+1. Read `/work/job.json`.
+2. Write `/work/receipt.json` with output hash and metadata.
+3. Write `/work/metrics.json` with `output_name`.
+4. Write output artifacts under `/work/output`.
 
 ## Network Policy
 
@@ -19,8 +21,7 @@ Active containers:
 
 ## Key Rules
 
+- Do not restore render, media, or transcode images to the active build matrix.
+- Do not import from `ryvion-archive`.
 - Keep runners workload-specific and small.
-- Do not add AI inference, agent hosting, model training, or speculative verifier code here.
-- Archive inactive runners instead of leaving them in the active build matrix.
-- `metrics.json` must have `output_name` field
-- Commits: Keep messages SHORT, no Co-Authored-By
+- Commits: Keep messages SHORT, no Co-Authored-By.

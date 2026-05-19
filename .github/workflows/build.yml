@@ -1,189 +1,27 @@
-name: Build Runner Images
+name: Validate Runtime Contracts
 
 on:
   push:
     branches: [main]
-    tags: ['v*.*.*']
   pull_request:
     branches: [main]
 
 permissions:
   contents: read
-  id-token: write
-  packages: write
-
-env:
-  TRIVY_IMAGE: ghcr.io/aquasecurity/trivy:0.65.0
-  GRYPE_VERSION: 0.110.0
 
 jobs:
   validate:
-    name: Validate active runners
+    name: Validate inactive runner matrix
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version: '1.25.x'
-          cache: false
-      - uses: actions/setup-python@v6
-        with:
-          python-version: '3.13'
-      - name: Check blender-runner syntax
-        run: python -m py_compile blender-runner/run.py
-      - name: Vet transcode-runner
-        run: cd transcode-runner && go vet ./...
 
-  build:
-    name: Build ${{ matrix.name }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 90
-    needs: validate
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: blender-runner
-            context: ./blender-runner
-            dockerfile: ./blender-runner/Dockerfile
-            image: ghcr.io/ryvion/blender-runner
-            platforms: linux/amd64
-            tags: |
-              ghcr.io/ryvion/blender-runner:latest
-              ghcr.io/ryvion/blender-runner:${{ github.sha }}
-          - name: transcode-runner
-            context: ./transcode-runner
-            dockerfile: ./transcode-runner/Dockerfile
-            image: ghcr.io/ryvion/transcode-runner
-            platforms: linux/amd64,linux/arm64
-            tags: |
-              ghcr.io/ryvion/transcode-runner:latest
-              ghcr.io/ryvion/transcode-runner:${{ github.sha }}
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Login to GHCR
-        if: github.event_name != 'pull_request'
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build and push scan tag
-        id: build
-        uses: docker/build-push-action@v6
-        with:
-          context: ${{ matrix.context }}
-          file: ${{ matrix.dockerfile }}
-          platforms: ${{ matrix.platforms }}
-          push: ${{ github.event_name != 'pull_request' }}
-          provenance: true
-          sbom: true
-          tags: ${{ matrix.image }}:${{ github.sha }}
-
-      - name: Run Trivy vulnerability scanner on image
-        if: github.event_name != 'pull_request'
+      - name: Ensure obsolete runners stay inactive
         run: |
-          export TRIVY_USERNAME="${{ github.actor }}"
-          export TRIVY_PASSWORD="${{ secrets.GITHUB_TOKEN }}"
-          mkdir -p "${{ github.workspace }}/.cache/trivy"
-          docker run --rm \
-            -v "${{ github.workspace }}/.cache/trivy:/root/.cache/" \
-            -e TRIVY_USERNAME \
-            -e TRIVY_PASSWORD \
-            "${TRIVY_IMAGE}" image \
-            --scanners vuln \
-            --skip-version-check \
-            --timeout 30m \
-            --format table \
-            --exit-code 1 \
-            --ignore-unfixed \
-            --pkg-types os,library \
-            --severity CRITICAL \
-            "${{ matrix.image }}:${{ github.sha }}"
+          test ! -d blender-runner
+          test ! -d transcode-runner
 
-      - name: Run Grype vulnerability scanner on image
-        if: github.event_name != 'pull_request'
+      - name: Ensure docs mention current runtime ownership
         run: |
-          tmpdir="$(mktemp -d)"
-          trap 'rm -rf "$tmpdir"' EXIT
-
-          curl -fsSLo "$tmpdir/grype.tar.gz" \
-            "https://github.com/anchore/grype/releases/download/v${GRYPE_VERSION}/grype_${GRYPE_VERSION}_linux_amd64.tar.gz"
-          tar -xzf "$tmpdir/grype.tar.gz" -C "$tmpdir"
-
-          printf '%s\n' \
-            'only-fixed: true' \
-            'fail-on-severity: critical' \
-            'ignore: []' >"$tmpdir/grype.yaml"
-
-          "$tmpdir/grype" -c "$tmpdir/grype.yaml" \
-            "registry:${{ matrix.image }}:${{ github.sha }}" \
-            -o table
-
-      - name: Promote validated runner image tags
-        if: github.event_name != 'pull_request'
-        env:
-          SOURCE_TAG: ${{ matrix.image }}:${{ github.sha }}
-          TARGET_TAGS: ${{ matrix.tags }}
-        run: |
-          promote_args=()
-          while IFS= read -r tag; do
-            [ -z "$tag" ] && continue
-            [ "$tag" = "$SOURCE_TAG" ] && continue
-            promote_args+=(-t "$tag")
-          done <<< "$TARGET_TAGS"
-
-          if [ "${#promote_args[@]}" -eq 0 ]; then
-            echo "No additional tags to promote"
-            exit 0
-          fi
-
-          docker buildx imagetools create \
-            "${promote_args[@]}" \
-            "$SOURCE_TAG"
-
-      - name: Run Trivy vulnerability scanner on filesystem
-        if: github.event_name == 'pull_request'
-        run: |
-          mkdir -p "${{ github.workspace }}/.cache/trivy"
-          docker run --rm \
-            -v "${{ github.workspace }}:/workspace" \
-            -v "${{ github.workspace }}/.cache/trivy:/root/.cache/" \
-            "${TRIVY_IMAGE}" fs \
-            --scanners vuln \
-            --skip-version-check \
-            --timeout 30m \
-            --format table \
-            --exit-code 1 \
-            --ignore-unfixed \
-            --pkg-types library \
-            --severity CRITICAL \
-            "/workspace/${{ matrix.context }}"
-
-      - name: Run Grype vulnerability scanner on filesystem
-        if: github.event_name == 'pull_request'
-        uses: anchore/scan-action@v7
-        with:
-          path: ${{ matrix.context }}
-          fail-build: true
-          severity-cutoff: critical
-          only-fixed: true
-          output-format: table
-
-      - name: Install cosign
-        if: github.event_name != 'pull_request'
-        uses: sigstore/cosign-installer@v4.1.0
-        with:
-          cosign-release: v2.6.3
-
-      - name: Sign validated runner image
-        if: github.event_name != 'pull_request'
-        env:
-          DIGEST: ${{ steps.build.outputs.digest }}
-        run: cosign sign --yes "${{ matrix.image }}@${DIGEST}"
+          grep -q "llama.cpp" README.md
+          grep -q "no active container runners" CLAUDE.md
