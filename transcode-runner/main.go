@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -24,6 +25,7 @@ type JobSpec struct {
 type receipt struct {
 	OutputHash string `json:"output_hash"`
 	OK         bool   `json:"ok"`
+	Error      string `json:"error,omitempty"`
 }
 
 type ffprobeOutput struct {
@@ -49,82 +51,123 @@ type ffprobeFormat struct {
 }
 
 func main() {
-	js := loadJob()
-	inputPath, outputPath := resolvePaths(js)
-	requireInput(inputPath)
+	if err := run("/work"); err != nil {
+		log.Print(err)
+		os.Exit(1)
+	}
+}
+
+func run(workRoot string) error {
+	start := time.Now()
+	js, err := loadJob(filepath.Join(workRoot, "job.json"))
+	if err != nil {
+		return failRun(workRoot, JobSpec{}, "load_job", err, time.Since(start))
+	}
+
+	inputPath, outputPath, err := resolvePaths(workRoot, js)
+	if err != nil {
+		return failRun(workRoot, js, "resolve_paths", err, time.Since(start))
+	}
+	if err := requireInput(inputPath); err != nil {
+		return failRun(workRoot, js, "input_missing", err, time.Since(start))
+	}
 
 	args := buildArgs(js, inputPath, outputPath)
-	start := time.Now()
 	cmd := exec.Command("ffmpeg", args...)
 	if out, err := cmd.CombinedOutput(); err != nil {
-		log.Fatalf("ffmpeg: %v\n%s", err, string(out))
+		if len(out) > 0 {
+			err = fmt.Errorf("ffmpeg: %w: %s", err, strings.TrimSpace(string(out)))
+		} else {
+			err = fmt.Errorf("ffmpeg: %w", err)
+		}
+		return failRun(workRoot, js, "ffmpeg", err, time.Since(start))
 	}
 	durationMs := time.Since(start).Milliseconds()
 
-	sum, size := hashFile(outputPath)
-	writeJSON("/work/receipt.json", receipt{OutputHash: sum, OK: true})
+	artifactPath, err := ensureRootArtifact(workRoot, outputPath)
+	if err != nil {
+		return failRun(workRoot, js, "artifact", err, time.Since(start))
+	}
+	sum, size, err := hashFile(artifactPath)
+	if err != nil {
+		return failRun(workRoot, js, "hash_output", err, time.Since(start))
+	}
+	if err := writeJSON(filepath.Join(workRoot, "receipt.json"), receipt{OutputHash: sum, OK: true}); err != nil {
+		return err
+	}
 	metrics := map[string]any{
 		"engine":       "ffmpeg",
 		"duration_ms":  durationMs,
 		"output_bytes": size,
-		"output_name":  filepath.Base(outputPath),
+		"output_name":  filepath.Base(artifactPath),
 	}
-	if ext := strings.TrimPrefix(strings.ToLower(filepath.Ext(outputPath)), "."); ext != "" {
+	if ext := strings.TrimPrefix(strings.ToLower(filepath.Ext(artifactPath)), "."); ext != "" {
 		metrics["output_format"] = ext
 	}
-	for key, value := range probeOutput(outputPath) {
+	for key, value := range probeOutput(artifactPath) {
 		metrics[key] = value
 	}
-	writeJSON("/work/metrics.json", metrics)
+	if err := writeJSON(filepath.Join(workRoot, "metrics.json"), metrics); err != nil {
+		return err
+	}
 	_ = json.NewEncoder(os.Stdout).Encode(map[string]any{
 		"output_hash": sum,
 		"ok":          true,
 	})
+	return nil
 }
 
-func loadJob() JobSpec {
-	f, err := os.Open("/work/job.json")
+func loadJob(path string) (JobSpec, error) {
+	f, err := os.Open(path)
 	if err != nil {
-		log.Fatalf("open job spec: %v", err)
+		return JobSpec{}, fmt.Errorf("open job spec: %w", err)
 	}
 	defer f.Close()
 
 	var js JobSpec
 	if err := json.NewDecoder(f).Decode(&js); err != nil {
-		log.Fatalf("decode job spec: %v", err)
+		return JobSpec{}, fmt.Errorf("decode job spec: %w", err)
 	}
-	return js
+	return js, nil
 }
 
-func resolvePaths(js JobSpec) (string, string) {
-	inputPath := safeWorkPath(js.InputFile, "/work/input")
-	outputPath := safeWorkPath(js.OutputFile, "/work/output/output.mp4")
+func resolvePaths(workRoot string, js JobSpec) (string, string, error) {
+	inputPath, err := safeWorkPath(workRoot, js.InputFile, "input")
+	if err != nil {
+		return "", "", err
+	}
+	outputPath, err := safeWorkPath(workRoot, js.OutputFile, "output.mp4")
+	if err != nil {
+		return "", "", err
+	}
 	if err := os.MkdirAll(filepath.Dir(outputPath), 0o755); err != nil {
-		log.Fatalf("create output directory: %v", err)
+		return "", "", fmt.Errorf("create output directory: %w", err)
 	}
-	return inputPath, outputPath
+	return inputPath, outputPath, nil
 }
 
-func safeWorkPath(value, fallback string) string {
+func safeWorkPath(workRoot, value, fallback string) (string, error) {
+	root := filepath.Clean(workRoot)
 	raw := strings.TrimSpace(value)
 	if raw == "" {
 		raw = fallback
 	}
 	if !filepath.IsAbs(raw) {
-		raw = filepath.Join("/work", raw)
+		raw = filepath.Join(root, raw)
 	}
 	clean := filepath.Clean(raw)
-	rel, err := filepath.Rel("/work", clean)
+	rel, err := filepath.Rel(root, clean)
 	if err != nil || rel == ".." || strings.HasPrefix(rel, "../") || filepath.IsAbs(rel) {
-		log.Fatalf("path escapes /work: %s", value)
+		return "", fmt.Errorf("path escapes %s: %s", root, value)
 	}
-	return clean
+	return clean, nil
 }
 
-func requireInput(inputPath string) {
+func requireInput(inputPath string) error {
 	if _, err := os.Stat(inputPath); err != nil {
-		log.Fatalf("input file missing: %v", err)
+		return fmt.Errorf("input file missing: %w", err)
 	}
+	return nil
 }
 
 func buildArgs(js JobSpec, inputPath, outputPath string) []string {
@@ -156,18 +199,84 @@ func buildArgs(js JobSpec, inputPath, outputPath string) []string {
 	return args
 }
 
-func hashFile(path string) (string, int64) {
+func hashFile(path string) (string, int64, error) {
 	f, err := os.Open(path)
 	if err != nil {
-		log.Fatalf("open output: %v", err)
+		return "", 0, fmt.Errorf("open output: %w", err)
 	}
 	defer f.Close()
 	h := sha256.New()
 	n, err := io.Copy(h, f)
 	if err != nil {
-		log.Fatalf("hash output: %v", err)
+		return "", 0, fmt.Errorf("hash output: %w", err)
 	}
-	return hex.EncodeToString(h.Sum(nil)), n
+	return hex.EncodeToString(h.Sum(nil)), n, nil
+}
+
+func ensureRootArtifact(workRoot, outputPath string) (string, error) {
+	rootArtifact := filepath.Join(filepath.Clean(workRoot), filepath.Base(outputPath))
+	if filepath.Clean(outputPath) == rootArtifact {
+		return outputPath, nil
+	}
+	in, err := os.Open(outputPath)
+	if err != nil {
+		return "", fmt.Errorf("open output artifact: %w", err)
+	}
+	defer in.Close()
+	out, err := os.Create(rootArtifact)
+	if err != nil {
+		return "", fmt.Errorf("create root artifact: %w", err)
+	}
+	if _, err := io.Copy(out, in); err != nil {
+		_ = out.Close()
+		return "", fmt.Errorf("copy root artifact: %w", err)
+	}
+	if err := out.Close(); err != nil {
+		return "", fmt.Errorf("close root artifact: %w", err)
+	}
+	return rootArtifact, nil
+}
+
+func failRun(workRoot string, js JobSpec, stage string, runErr error, duration time.Duration) error {
+	outputName := safeOutputName(js.OutputFile)
+	errorText := strings.TrimSpace(runErr.Error())
+	failureHash := failureOutputHash(stage, errorText)
+	writeErr := writeFailureContract(workRoot, outputName, stage, errorText, failureHash, duration)
+	if writeErr != nil {
+		return errors.Join(runErr, writeErr)
+	}
+	return runErr
+}
+
+func writeFailureContract(workRoot, outputName, stage, errorText, outputHash string, duration time.Duration) error {
+	if err := writeJSON(filepath.Join(workRoot, "receipt.json"), receipt{
+		OutputHash: outputHash,
+		OK:         false,
+		Error:      errorText,
+	}); err != nil {
+		return err
+	}
+	return writeJSON(filepath.Join(workRoot, "metrics.json"), map[string]any{
+		"engine":      "ffmpeg",
+		"duration_ms": duration.Milliseconds(),
+		"output_name": outputName,
+		"status":      "failed",
+		"error_stage": stage,
+		"error":       errorText,
+	})
+}
+
+func failureOutputHash(stage, errorText string) string {
+	sum := sha256.Sum256([]byte("transcode-runner failure\n" + stage + "\n" + errorText))
+	return hex.EncodeToString(sum[:])
+}
+
+func safeOutputName(outputFile string) string {
+	name := filepath.Base(filepath.Clean(strings.TrimSpace(outputFile)))
+	if name == "." || name == string(filepath.Separator) || name == "" {
+		return "output.mp4"
+	}
+	return name
 }
 
 func probeOutput(path string) map[string]any {
@@ -281,14 +390,15 @@ func parseFrameRate(value string) (float64, bool) {
 	return parseFloat(value)
 }
 
-func writeJSON(path string, v any) {
+func writeJSON(path string, v any) error {
 	data, err := json.Marshal(v)
 	if err != nil {
-		log.Fatalf("marshal %s: %v", path, err)
+		return fmt.Errorf("marshal %s: %w", path, err)
 	}
 	if err := os.WriteFile(path, data, 0o644); err != nil {
-		log.Fatalf("write %s: %v", path, err)
+		return fmt.Errorf("write %s: %w", path, err)
 	}
+	return nil
 }
 
 func init() {
