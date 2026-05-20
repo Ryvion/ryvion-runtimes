@@ -10,6 +10,9 @@ Current execution ownership:
   replay jobs for autonomous market agents.
 - Runner image definitions should be added here only when the hub/node contract
   needs a container image that cannot live as node-local runtime plumbing.
+- The main-branch workflow builds, smoke-tests, and publishes
+  `ghcr.io/ryvion/market-sim-runner:latest`, which is the hub's default
+  managed OCI image for `marketarena.run.v1` jobs.
 
 Runner contract for future images:
 
