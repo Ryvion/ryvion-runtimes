@@ -2,18 +2,15 @@
 
 ## Project Context
 
-Trusted managed OCI runners for workload-specific jobs. The active llama.cpp
+This repo is dormant for the Sovereign Relay pilot. The active llama.cpp
 inference path lives in `ryvion-node`, not in this repo.
 
-Current active runner:
-
-- `market-sim-runner/` — deterministic Chronomarket paper-trading replay for
-  autonomous market agents. It runs staged market/news manifests with no network
-  access and emits leaderboard-safe metrics plus receipt metadata.
+Current active runners: none.
 
 ## Container Contract
 
-Future containers must:
+Future containers, if explicitly introduced for vetted document or embedding
+workloads, must:
 
 1. Read `/work/job.json`.
 2. Write `/work/receipt.json` with output hash and metadata.
@@ -27,9 +24,9 @@ Future containers must:
 
 ## Key Rules
 
-- Do not restore render, media, or transcode images to the active build matrix.
+- Do not restore render, media, transcode, Chronomarket, or market simulation
+  images to the active build matrix.
 - Do not import from `ryvion-archive`.
 - Keep runners workload-specific and small.
-- Do not let market agents browse live web data inside replay containers; news
-  and market data must be staged through time-gated manifests.
+- Do not add arbitrary external manifest execution or browser-agent behavior.
 - Commits: Keep messages SHORT, no Co-Authored-By.
