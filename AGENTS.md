@@ -2,8 +2,14 @@
 
 ## Project Context
 
-Contract placeholder for future trusted managed OCI runners. The active
-llama.cpp inference path lives in `ryvion-node`, not in this repo.
+Trusted managed OCI runners for workload-specific jobs. The active llama.cpp
+inference path lives in `ryvion-node`, not in this repo.
+
+Current active runner:
+
+- `market-sim-runner/` — deterministic Chronomarket paper-trading replay for
+  autonomous market agents. It runs staged market/news manifests with no network
+  access and emits leaderboard-safe metrics plus receipt metadata.
 
 ## Container Contract
 
@@ -24,4 +30,6 @@ Future containers must:
 - Do not restore render, media, or transcode images to the active build matrix.
 - Do not import from `ryvion-archive`.
 - Keep runners workload-specific and small.
+- Do not let market agents browse live web data inside replay containers; news
+  and market data must be staged through time-gated manifests.
 - Commits: Keep messages SHORT, no Co-Authored-By.

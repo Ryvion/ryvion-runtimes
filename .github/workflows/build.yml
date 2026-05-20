@@ -27,4 +27,7 @@ jobs:
       - name: Ensure docs mention current runtime ownership
         run: |
           grep -q "llama.cpp" README.md
-          grep -q "no active container runners" CLAUDE.md
+          grep -q "market-sim-runner" CLAUDE.md
+
+      - name: Test market replay runner
+        run: python -m unittest market-sim-runner/runner_test.py

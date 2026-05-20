@@ -1,13 +1,13 @@
 # Ryvion runtimes
 
-This repository is currently a contract placeholder for trusted managed OCI
-runners. There are no active render, media, or transcode images in the build
-matrix.
+This repository holds trusted managed OCI runners. There are no active render,
+media, or transcode images in the build matrix.
 
 Current execution ownership:
 
 - Native AI inference runs in `ryvion-node` through a local llama.cpp server.
-- Managed OCI remains available for future custom/code workloads.
+- `market-sim-runner/` executes deterministic Chronomarket paper-trading
+  replay jobs for autonomous market agents.
 - Runner image definitions should be added here only when the hub/node contract
   needs a container image that cannot live as node-local runtime plumbing.
 
