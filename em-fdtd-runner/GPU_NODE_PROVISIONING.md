@@ -10,9 +10,19 @@ just delivery plumbing.
 
 > **Honest scope for v1.** gprMax's CUDA engine is a Cython source build + pycuda
 > + the NVIDIA CUDA Toolkit (with `nvcc` on `PATH` at *runtime* — pycuda
-> JIT-compiles the kernels). NVIDIA is the supported path; AMD/ROCm is
-> best-effort. The v1 node relies on the **host** CUDA toolkit being installed;
-> a fully self-contained "ships its own nvcc" bundle is a later optimization.
+> JIT-compiles the kernels). The v1 node relies on the **host** CUDA toolkit
+> being installed; a fully self-contained "ships its own nvcc" bundle is a later
+> optimization.
+
+> **NVIDIA only, by design (scheduler is vendor-aware).** gprMax GPU-accelerates
+> ONLY on NVIDIA/CUDA — AMD/ROCm has no gprMax backend yet. So the node advertises
+> EM (`runtime:fdtd`) **only on a CUDA GPU**; AMD/CPU/Apple nodes are excluded by
+> default and never get an EM sweep they would run CPU-slow and time out. This is
+> deliberate — it protects operator earnings and buyer ETAs. An AMD GPU (e.g. a
+> Radeon 7900 XTX) can still contribute via the **opt-in CPU lane**
+> (`RYV_EM_ALLOW_CPU=1`): real physics, ~10–20× slower, only worth it for small
+> sims (mind the hub's ~30-min assigned-job reaper). The hub scores CUDA nodes
+> above CPU-lane nodes (`runtime:fdtd:accel:cuda` vs `…:cpu`).
 
 ---
 
@@ -215,7 +225,10 @@ export RYV_EM_ALLOW_UNSIGNED_BUNDLE=1                     # cache-hit still chec
 | `entrypoint not found after extract` | archive tarred the dir, not its contents | `tar -C dist/gprmax-v1 -czf … .` (note the trailing `.`) |
 | OOM / exit early on GPU | cell budget too big for VRAM | lower grid `resolution` / cap `max_cells`; raise `est_vram_mb` |
 
-Node EM env knobs (all read by `ryvion-node/internal/runner/native_em*.go`):
+Node EM env knobs (read by `ryvion-node`):
 `RYV_EM_BUNDLE_BASE_URL`, `RYV_EM_BUNDLE_PUBKEY`, `RYV_EM_ALLOW_UNSIGNED_BUNDLE`,
 `RYVION_EM_RUNTIME_ROOT`, `RYV_EM_PYTHON`, `RYV_EM_CPU_CORES`, `RYV_EM_RAM_CAP_MB`.
-Engine GPU knob (read by `engine_gprmax.py`): `RYVION_EM_GPU` (`auto|cuda|none`).
+Capability gating: `RYV_EM_ALLOW_CPU=1` (opt into the slow CPU lane on AMD/non-CUDA
+GPUs), `RYV_DISABLE_NATIVE_EM=1` (turn EM off on this node), `RYV_EM_ENGINE`
+(pin engine). Engine GPU knob (read by `engine_gprmax.py`): `RYVION_EM_GPU`
+(`auto|cuda|none`).
