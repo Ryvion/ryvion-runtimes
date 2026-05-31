@@ -1,0 +1,141 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://ryvion.ai/schemas/em.job.v1.json",
+  "title": "em.job.v1",
+  "description": "Ryvion EM (FDTD) simulation job contract written to /work/job.json. One job == one parameter point.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "task",
+    "engine",
+    "device_template",
+    "params"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "em.job.v1"
+    },
+    "task": {
+      "type": "string",
+      "const": "em_simulation",
+      "description": "MUST be em_simulation (not finetune) so the node keeps --network=none."
+    },
+    "engine": {
+      "type": "string",
+      "enum": ["gprmax", "openems", "meep"],
+      "description": "FDTD engine. gprmax/openems lead the native bundle path; meep is the OCI/Linux photonics lane."
+    },
+    "engine_version": {
+      "type": "string",
+      "description": "Pinned engine version + commit, echoed into the receipt for QA determinism."
+    },
+    "study_id": { "type": ["string", "null"] },
+    "variant_id": { "type": ["string", "null"] },
+    "point_index": { "type": ["integer", "null"], "minimum": 0 },
+    "seed": { "type": ["integer", "null"] },
+    "device_template": {
+      "type": "string",
+      "enum": [
+        "grating_coupler",
+        "waveguide_coupler",
+        "antenna_unit_cell",
+        "metasurface_unit_cell"
+      ]
+    },
+    "params": {
+      "type": "object",
+      "description": "Template-specific parametric geometry inputs. Validated by the template generator."
+    },
+    "materials": { "type": "object" },
+    "source": {
+      "type": "object",
+      "properties": {
+        "type": { "type": "string" },
+        "center_wavelength_nm": { "type": "number" },
+        "center_freq_ghz": { "type": "number" },
+        "bandwidth": { "type": "number" },
+        "polarization": { "type": "string" },
+        "port": { "type": "string" }
+      }
+    },
+    "monitors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "type"],
+        "properties": {
+          "name": { "type": "string" },
+          "type": {
+            "type": "string",
+            "enum": ["flux", "mode", "s_param", "field", "radiation"]
+          }
+        }
+      }
+    },
+    "grid": {
+      "type": "object",
+      "properties": {
+        "resolution": { "type": "number" },
+        "pml_layers": { "type": "integer" },
+        "dimensionality": { "type": "integer", "enum": [2, 3] },
+        "symmetry": { "type": ["string", "null"] }
+      }
+    },
+    "frequency": {
+      "type": "object",
+      "properties": {
+        "points": { "type": "integer", "minimum": 1 },
+        "range_nm": {
+          "type": "array",
+          "items": { "type": "number" },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "range_ghz": {
+          "type": "array",
+          "items": { "type": "number" },
+          "minItems": 2,
+          "maxItems": 2
+        }
+      }
+    },
+    "run": {
+      "type": "object",
+      "properties": {
+        "until": { "type": "string" },
+        "decay_threshold_db": { "type": "number" },
+        "max_steps": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "outputs": {
+      "type": "object",
+      "properties": {
+        "want": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "transmission",
+              "reflection",
+              "phase",
+              "fom",
+              "s_params",
+              "radiation_pattern",
+              "best_geometry"
+            ]
+          }
+        }
+      }
+    },
+    "budget": {
+      "type": "object",
+      "properties": {
+        "max_cells": { "type": "integer", "minimum": 1 },
+        "est_vram_mb": { "type": "integer", "minimum": 0 },
+        "est_runtime_s": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "input_url": { "type": ["string", "null"] }
+  }
+}

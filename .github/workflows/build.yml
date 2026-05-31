@@ -12,14 +12,17 @@ permissions:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+  IMAGE: ghcr.io/ryvion/em-fdtd-runner
 
 jobs:
   validate:
-    name: Validate dormant runner repo
+    name: Validate runner repo
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
+      # Dormancy guard, RELAXED: the EM (FDTD) runner is now an allowed active
+      # image. Obsolete render/media/market families stay blocked.
       - name: Ensure obsolete runners stay inactive
         run: |
           test ! -d blender-runner
@@ -29,4 +32,71 @@ jobs:
       - name: Ensure docs mention current runtime ownership
         run: |
           grep -q "llama.cpp" README.md
-          grep -q "no active container runners" CLAUDE.md
+          grep -q "em-fdtd-runner" CLAUDE.md
+          grep -q "em-fdtd-runner" README.md
+
+      - name: Validate EM job schema is valid JSON
+        run: |
+          python3 -c "import json; json.load(open('em-fdtd-runner/schema.json'))"
+
+      - name: Python syntax check (py_compile) on EM runner
+        run: |
+          python3 -m py_compile em-fdtd-runner/*.py \
+            em-fdtd-runner/templates/*.py \
+            em-fdtd-runner/tools/*.py \
+            em-fdtd-runner/tests/*.py
+
+      # Unit tests for the IR->gprMax input GENERATION, the .out HDF5 PARSER
+      # (against synthetic fixture files), and the native-bundle build/verify
+      # round-trip. These need numpy + h5py but NO gprMax / GPU.
+      - name: Install test deps (numpy + h5py, no GPU/engine)
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install "numpy>=1.26,<3" "h5py>=3.10"
+      - name: Run EM runner unit tests
+        working-directory: em-fdtd-runner
+        run: |
+          python3 -m unittest discover -s tests -p 'test_*.py' -v
+
+      # License gate (doc §3.1): GPL/GPLv3 engines are fine as a hosted backend,
+      # but AGPL must never enter the image. Scan dependency/license manifests
+      # only (not prose in docs/comments, which legitimately mention "AGPL").
+      - name: Ensure no AGPL dependency declared
+        run: |
+          MATCHES=$(grep -rilE 'agpl' \
+            --include='requirements*.txt' \
+            --include='*.lock' \
+            --include='LICENSE*' \
+            --include='*.cfg' \
+            --include='pyproject.toml' \
+            em-fdtd-runner/ || true)
+          if [ -n "$MATCHES" ]; then
+            echo "AGPL referenced in dependency/license manifest:"; echo "$MATCHES"; exit 1
+          fi
+          echo "no AGPL dependency manifest match"
+
+  build-em:
+    name: Build em-fdtd-runner (OCI fallback)
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        if: github.event_name == 'push'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build (and push on main) em-fdtd-runner
+        uses: docker/build-push-action@v6
+        with:
+          context: em-fdtd-runner
+          file: em-fdtd-runner/Dockerfile
+          push: ${{ github.event_name == 'push' }}
+          tags: ${{ env.IMAGE }}:latest

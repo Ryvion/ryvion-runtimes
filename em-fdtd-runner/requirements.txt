@@ -1,0 +1,23 @@
+# em-fdtd-runner runtime dependencies.
+#
+# The BASE image (Dockerfile) installs only numpy so the analytic fallback +
+# result contract work everywhere (CI/dev with no GPU). The heavy FDTD engine
+# layers are added in per-engine build variants / native bundles, NOT here, so
+# the base stays small and CI stays GPU-free.
+#
+# License note (doc 3.1): every dependency below is BSD/MIT/GPL/GPLv3 — all are
+# clean for a hosted backend that is never distributed to buyers. The CI license
+# gate scans this file and rejects network-copyleft (A-GPL) dependencies; none
+# are declared here.
+
+# --- base (always) ---
+numpy>=1.26,<3           # BSD-3-Clause. result.npz + analytic solver + FFTs.
+
+# --- output parsing for the real gprMax path (added in the gprmax variant) ---
+# h5py is needed to read the gprMax .out HDF5 file. BSD-3-Clause.
+# h5py>=3.10               # enable in the :gprmax build variant / native bundle.
+
+# --- engines (added per build variant / native bundle, NOT the base image) ---
+# gprMax>=3.1.7           # GPLv3. Native CUDA FDTD (antenna + 6G metasurface).
+# openEMS                 # GPL. Prebuilt RF/antenna binaries (incl. Windows).
+# meep                    # GPL. Photonics (OCI/Linux lane; conda-forge build).
