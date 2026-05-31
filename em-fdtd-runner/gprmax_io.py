@@ -233,8 +233,17 @@ def _emit_receivers(geo: Geometry, lines: List[str]) -> None:
             # gprMax far-field (#rx_array / snapshots) is a // TODO(em-verify).
             continue
         x, y, z = mon.position
-        # #rx: x y z   (named via the optional identifier form)
-        lines.append(f"#rx: {_fmt(x)} {_fmt(y)} {_fmt(z)}")
+        name = (mon.name or "").strip()
+        if name:
+            # Named-receiver form `#rx: x y z id out1 out2 ...` so parse_output can
+            # tell e.g. the transmitted "T" monitor from the reflected "R" one. We
+            # record all E/H components; the parser selects the source-driven one.
+            lines.append(
+                f"#rx: {_fmt(x)} {_fmt(y)} {_fmt(z)} {name} Ex Ey Ez Hx Hy Hz"
+            )
+        else:
+            # Coordinate-only form; gprMax auto-names it Rx(n).
+            lines.append(f"#rx: {_fmt(x)} {_fmt(y)} {_fmt(z)}")
 
 
 # ---------------------------------------------------------------------------

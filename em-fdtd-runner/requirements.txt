@@ -18,6 +18,15 @@ numpy>=1.26,<3           # BSD-3-Clause. result.npz + analytic solver + FFTs.
 # h5py>=3.10               # enable in the :gprmax build variant / native bundle.
 
 # --- engines (added per build variant / native bundle, NOT the base image) ---
-# gprMax>=3.1.7           # GPLv3. Native CUDA FDTD (antenna + 6G metasurface).
-# openEMS                 # GPL. Prebuilt RF/antenna binaries (incl. Windows).
-# meep                    # GPL. Photonics (OCI/Linux lane; conda-forge build).
+# IMPORTANT (engine install reality — see em-fdtd-runner/GPU_NODE_PROVISIONING.md):
+# gprMax's CUDA engine is NOT a plain `pip install`. It is a Cython source build
+# inside a conda env, plus pycuda, plus the NVIDIA CUDA Toolkit with `nvcc` on
+# PATH AT RUNTIME (pycuda JIT-compiles the FDTD kernels). Build it like:
+#   conda env create -f gprMax/conda_env.yml && conda activate gprMax
+#   cd gprMax && python setup.py build && python setup.py install
+#   pip install pycuda h5py        # h5py (BSD-3) reads the .out HDF5 output
+# gprMax / openEMS / Meep are all GPL/GPLv3 — clean for a hosted backend that is
+# never distributed to buyers (no copyleft distribution trigger); no AGPL deps.
+#   gprMax        # GPLv3. Native CUDA FDTD (antenna + 6G metasurface). Source build.
+#   openEMS       # GPL. Prebuilt RF/antenna binaries (incl. Windows).
+#   meep          # GPL. Photonics (OCI/Linux lane; conda-forge build).

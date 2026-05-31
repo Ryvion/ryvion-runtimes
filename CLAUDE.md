@@ -8,6 +8,10 @@ Active runners:
   the `Dockerfile` here is the OCI/Linux fallback. Engines: gprMax/openEMS lead
   the native path (antenna + 6G-metasurface templates); Meep is the OCI photonics
   lane. Job contract is `em.job.v1` (`em-fdtd-runner/schema.json`).
+  **Real-physics provisioning:** `em-fdtd-runner/GPU_NODE_PROVISIONING.md` (install
+  gprMax → verify → publish bundle). One-command truth check on a GPU box:
+  `python tools/smoke_real_physics.py` (REAL = exit 0; `+analytic` = exit 1).
+  gprMax's CUDA engine is a Cython source build, NOT a pip wheel.
 
 The native llama.cpp inference path lives in `ryvion-node`.
 

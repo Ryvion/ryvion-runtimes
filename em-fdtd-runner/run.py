@@ -23,8 +23,37 @@ import time
 import traceback
 from typing import Any, Dict, Optional
 
-WORK_DIR = os.environ.get("RYVION_WORK_DIR", "/work")
-JOB_PATH = os.path.join(WORK_DIR, "job.json")
+def _arg_value(argv, name: str) -> Optional[str]:
+    """Return the value of `--name X` or `--name=X` from argv, else None."""
+    flag = "--" + name
+    for i, a in enumerate(argv):
+        if a == flag and i + 1 < len(argv):
+            return argv[i + 1]
+        if a.startswith(flag + "="):
+            return a.split("=", 1)[1]
+    return None
+
+
+def _resolve_work_dir(argv) -> str:
+    """Work-dir precedence: --work argv > RYVION_WORK_DIR > RYV_WORK_DIR > /work.
+
+    The OCI image launches run.py with no args and RYVION_WORK_DIR=/work; the
+    node-agent native bundle launches it with `--work <dir>` (and RYV_WORK_DIR).
+    Honouring both keeps ONE runner working in both lanes.
+    """
+    work = _arg_value(argv, "work")
+    if not work:
+        work = os.environ.get("RYVION_WORK_DIR") or os.environ.get("RYV_WORK_DIR") or "/work"
+    return work
+
+
+_ARGV = sys.argv[1:]
+WORK_DIR = _resolve_work_dir(_ARGV)
+# Make the resolved work dir the single source of truth for every engine module
+# (engine_gprmax reads RYVION_WORK_DIR for its run dir), regardless of how the
+# runner was launched.
+os.environ["RYVION_WORK_DIR"] = WORK_DIR
+JOB_PATH = _arg_value(_ARGV, "job") or os.path.join(WORK_DIR, "job.json")
 OUTPUT_DIR = os.path.join(WORK_DIR, "output")
 RECEIPT_PATH = os.path.join(WORK_DIR, "receipt.json")
 METRICS_PATH = os.path.join(WORK_DIR, "metrics.json")

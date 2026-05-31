@@ -26,8 +26,9 @@ download / verify / auto-update path the inference runtime already uses for
 ```
 
 `<engine>` ∈ `gprmax | openems | meep`. `<version>` is `engine_version` from the
-job contract (e.g. `gprmax-3.1.7+cuda12`). gprMax/openEMS package cleanly
-(pip wheels / prebuilt binaries); Meep stays OCI/Linux.
+job contract (the bundle KEY, e.g. `gprmax-v1`). **gprMax's CUDA engine is a
+Cython source build + pycuda, NOT a pip wheel** — build it on a target OS+GPU per
+`GPU_NODE_PROVISIONING.md`. openEMS ships prebuilt binaries; Meep stays OCI/Linux.
 
 ## manifest.json (signed)
 
