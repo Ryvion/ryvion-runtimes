@@ -40,9 +40,7 @@ def solve(geo: Geometry, job: Dict[str, Any]) -> Dict[str, Any]:
     try:
         import meep_io
 
-        sim, monitors = meep_io.build_simulation(geo, job)      # TODO(em-verify)
-        meep_io.run_until_decay(sim, geo, job)                  # TODO(em-verify)
-        return meep_io.extract(sim, monitors, job, geo)         # TODO(em-verify)
+        return meep_io.solve_native(geo, job)
     except Exception as exc:  # noqa: BLE001
         sys.stderr.write(f"engine_meep: native solve failed, degrading to analytic: {exc}\n")
         return engine_analytic.solve(geo, job)
