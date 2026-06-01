@@ -138,9 +138,47 @@ def fail(message: str, job: Optional[Dict[str, Any]] = None, exit_code: int = 1)
     sys.exit(exit_code)
 
 
+def _ensure_relocatable_python() -> None:
+    """Finalize a conda-pack'd embedded interpreter at its extracted location.
+
+    A self-contained native bundle (see tools/build_bundle.py) ships its engine
+    INSIDE a conda-pack'd `python/` env. conda-pack defers the final path rewrite
+    to a generated `python/bin/conda-unpack`, which MUST run once at the dir the
+    node-agent extracted the bundle into (~/.ryvion/runtimes/em/<engine>-<ver>/).
+    Without it the engine's dylibs (libmeep/MPI/HDF5) resolve to a non-existent
+    build prefix and `import meep` fails -> the runner would silently degrade to
+    the analytic solver. We run it lazily on first launch (idempotent, marked).
+
+    No-op when there is no embedded python (OCI image / runner-only bundle that
+    uses the operator's RYV_EM_PYTHON), so the OCI + native lanes share one runner.
+    Best-effort: any failure is logged, not fatal — the engine still degrades
+    cleanly if the interpreter turns out unusable.
+    """
+    import subprocess
+
+    bundle_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    py_dir = os.path.join(bundle_root, "python")
+    marker = os.path.join(py_dir, ".ryvion-unpacked")
+    if os.path.exists(marker):
+        return
+    unpack = os.path.join(py_dir, "bin", "conda-unpack")
+    py = os.path.join(py_dir, "bin", "python3")
+    if not (os.path.exists(unpack) and os.path.exists(py)):
+        return  # no embedded conda env -> nothing to finalize.
+    try:
+        subprocess.run([py, unpack], check=True, timeout=300,
+                       stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        with open(marker, "w", encoding="utf-8") as fh:
+            fh.write("ok\n")
+        sys.stderr.write("em-fdtd-runner: finalized embedded python (conda-unpack)\n")
+    except Exception as exc:  # noqa: BLE001
+        sys.stderr.write(f"em-fdtd-runner: conda-unpack skipped ({exc})\n")
+
+
 def main() -> None:
     signal.signal(signal.SIGTERM, _on_sigterm)
     signal.signal(signal.SIGINT, _on_sigterm)
+    _ensure_relocatable_python()
 
     started = time.time()
     job: Dict[str, Any] = {}

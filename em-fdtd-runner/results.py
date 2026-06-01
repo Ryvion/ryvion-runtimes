@@ -52,6 +52,11 @@ def build_record(
         "converged": bool(vectors.get("converged", False)),
         "engine": job.get("engine"),
         "engine_version": engine_version,
+        # The actual solver that produced these vectors ("gprmax"|"meep"|"openems"
+        # |"analytic"). Lets the dataset/QA distinguish a real FDTD solve from the
+        # deterministic analytic fallback without re-parsing the engine_version
+        # suffix. Mirrors run.py's "+analytic" tagging (architecture doc §3.2).
+        "solver": vectors.get("solver"),
         "mesh_cells": int(vectors.get("mesh_cells", 0)),
         "wall_time_s": wall_time_s,
     }
