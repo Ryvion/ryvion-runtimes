@@ -68,7 +68,9 @@ def _sample_job(template: str) -> Dict[str, Any]:
             "params": {"element_size_um": 4.0, "post_h_um": 30.0, "post_r_um": 8.0,
                        "lattice_period_um": 40.0, "freq_ghz": 100.0},
             "materials": {"post_eps": 11.7},
-            "grid": {"resolution": 20, "pml_layers": 8, "dimensionality": 3},
+            # resolution = cells/µm; 2 keeps the smoke grid small + fast (~0.5M
+            # cells) while still resolving the post. Real studies tune this up.
+            "grid": {"resolution": 2, "pml_layers": 8, "dimensionality": 3},
             "frequency": {"points": 21, "range_ghz": [80.0, 120.0]},
             "outputs": {"want": ["reflection", "transmission", "phase"]},
             "budget": {"max_cells": 30000000, "est_vram_mb": 4000, "est_runtime_s": 300},

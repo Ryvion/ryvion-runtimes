@@ -32,7 +32,10 @@ def build(params: Dict[str, Any], job: Dict[str, Any]) -> Geometry:
     post_eps = float(materials.get("post_eps", 11.7))  # silicon-like default
 
     grid = job.get("grid", {}) or {}
-    res_per_um = float(grid.get("resolution", 20))
+    # cells per µm. Default 4 (cell 0.25 µm) resolves the post geometry without
+    # exploding the 3D grid; the old default of 20 built ~500M-cell domains that
+    # need tens of GB of RAM/VRAM. Buyers raise it for higher fidelity.
+    res_per_um = float(grid.get("resolution", 4))
     res = res_per_um / UM
     pml = int(grid.get("pml_layers", 8))
 
