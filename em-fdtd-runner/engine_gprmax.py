@@ -123,6 +123,18 @@ def _solve_native(geo: Geometry, job: Dict[str, Any]) -> Dict[str, Any]:
 
     cmd = [sys.executable, "-m", "gprMax", in_path]
     gpu = _gpu_flag()
+    # gprMax's CUDA solver does NOT support #transmission_line (the antenna S11
+    # feed). Such a run must execute on CPU, or gprMax errors out and we lose the
+    # real solve to the analytic fallback. Detect it and drop -gpu so antennas
+    # still produce REAL physics (CPU-bound). Metasurface/grating/waveguide use a
+    # dipole/plane-wave source + receivers and stay on the GPU.
+    # TODO(em-verify): a GPU antenna path needs the #voltage_source + reference-run
+    # S11 method (two solves) instead of the one-run transmission-line method.
+    if gpu is not None and "#transmission_line" in in_text:
+        sys.stderr.write(
+            "engine_gprmax: #transmission_line present -> running on CPU "
+            "(gprMax GPU has no transmission-line support)\n")
+        gpu = None
     if gpu is not None:
         cmd += ["-gpu", gpu]
 
