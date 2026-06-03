@@ -80,6 +80,35 @@ def _is_transmission_line_run(geo: Geometry) -> bool:
     return any(m.kind == "s_param" for m in geo.monitors)
 
 
+# gprMax executes `#python: ... #end_python:` (and `#import:`) blocks found in a
+# .in file when it reads the file. Any buyer-controlled string interpolated into
+# the input is therefore a remote-code-execution sink unless it is forced onto a
+# single line with no `#`. See SECURITY-AUDIT-2026-06-02.
+_GPRMAX_SCRIPTING_DIRECTIVES = ("#python", "#end_python", "#import", "#end_import")
+
+
+def _safe_inline_token(value: Optional[Any], *, max_len: int = 128) -> str:
+    """Collapse an untrusted job string into one safe token for inline use in a
+    gprMax input file: all whitespace (incl. newlines) becomes single spaces and
+    every `#` is dropped, then the result is length-capped. This makes it
+    impossible for the value to open a new line or a `#python:` directive."""
+    if value is None:
+        return ""
+    token = " ".join(str(value).split())  # \n \r \t -> single spaces (kills line breaks)
+    token = token.replace("#", "")        # neutralize gprMax directive character
+    return token[:max_len]
+
+
+def _assert_no_scripting(lines: List[str]) -> None:
+    """Defense in depth: build_input never legitimately emits a gprMax scripting
+    directive, so if one is present an untrusted field injected it. Refuse to run
+    rather than hand gprMax a file that would execute attacker Python."""
+    for ln in lines:
+        head = ln.lstrip().lower()
+        if head.startswith(_GPRMAX_SCRIPTING_DIRECTIVES):
+            raise ValueError(f"refusing gprMax input with scripting directive: {ln!r}")
+
+
 def build_input(geo: Geometry, job: Dict[str, Any]) -> str:
     """Translate the Geometry IR into a gprMax input-file string.
 
@@ -105,7 +134,8 @@ def build_input(geo: Geometry, job: Dict[str, Any]) -> str:
         dom_z = sz
 
     lines: List[str] = []
-    title = f"ryvion-em {geo.template} {job.get('variant_id') or ''}".strip()
+    variant = _safe_inline_token(job.get("variant_id"))
+    title = f"ryvion-em {geo.template} {variant}".strip()
     lines.append(f"#title: {title}")
     lines.append(f"#domain: {_fmt(sx)} {_fmt(sy)} {_fmt(dom_z if dom.dimensionality == 2 else sz)}")
     lines.append(f"#dx_dy_dz: {_fmt(dx)} {_fmt(dy)} {_fmt(dz)}")
@@ -133,6 +163,8 @@ def build_input(geo: Geometry, job: Dict[str, Any]) -> str:
     # Receivers / monitors -> #rx at each monitor position.
     _emit_receivers(geo, lines)
 
+    # Final safety net: no scripting directive may reach the generated .in file.
+    _assert_no_scripting(lines)
     return "\n".join(lines) + "\n"
 
 

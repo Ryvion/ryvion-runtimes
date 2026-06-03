@@ -210,5 +210,45 @@ class TestBuildInput(unittest.TestCase):
         self.assertEqual(t1, t2)
 
 
+class TestInputInjectionSecurity(unittest.TestCase):
+    """Regression guard for the gprMax `#python:` injection RCE (variant_id was
+    interpolated raw into #title; gprMax executes #python: blocks). See
+    SECURITY-AUDIT-2026-06-02."""
+
+    # The exact proof-of-concept payload from the audit.
+    POC = "x\n#python:\nimport os; os.system('id')\n#end_python:"
+
+    def _build(self, job):
+        tmpl = registry.get(job["device_template"])
+        geo = tmpl.build(job["params"], job)
+        return gprmax_io.build_input(geo, job)
+
+    def test_variant_id_cannot_inject_scripting_block(self):
+        job = dict(ANTENNA_JOB, variant_id=self.POC)
+        text = self._build(job)
+        lowered = text.lower()
+        self.assertNotIn("#python", lowered)
+        self.assertNotIn("#end_python", lowered)
+        self.assertNotIn("#import", lowered)
+        # Title stays a single line (no breakout).
+        for line in text.splitlines():
+            if line.startswith("#title"):
+                self.assertEqual(line.count("#"), 1)
+
+    def test_sanitizer_strips_newlines_and_hash(self):
+        tok = gprmax_io._safe_inline_token(self.POC)
+        self.assertNotIn("\n", tok)
+        self.assertNotIn("#", tok)
+
+    def test_guard_rejects_smuggled_directive(self):
+        with self.assertRaises(ValueError):
+            gprmax_io._assert_no_scripting(["#title: ok", "  #python:", "import os"])
+
+    def test_legit_variant_id_unaffected(self):
+        job = dict(ANTENNA_JOB, variant_id="sweep-0042.v3")
+        text = self._build(job)
+        self.assertIn("sweep-0042.v3", text)
+
+
 if __name__ == "__main__":
     unittest.main()

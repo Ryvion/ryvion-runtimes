@@ -80,6 +80,28 @@ def load_job_safe() -> Dict[str, Any]:
         return {}
 
 
+# Free-text job fields are echoed into the gprMax input file, the receipt, and
+# the result metadata. Reject control characters / newlines and absurd lengths so
+# a crafted value cannot inject input-file directives (gprMax runs `#python:`
+# blocks) or corrupt downstream artifacts. Numeric/structural fields are validated
+# where they are consumed. See SECURITY-AUDIT-2026-06-02.
+_UNTRUSTED_STR_FIELDS = ("variant_id", "study_id", "engine", "engine_version", "device_template")
+_MAX_STR_FIELD_LEN = 256
+
+
+def _validate_job_strings(job: Dict[str, Any]) -> None:
+    for field in _UNTRUSTED_STR_FIELDS:
+        v = job.get(field)
+        if v is None:
+            continue
+        if not isinstance(v, str):
+            raise ValueError(f"job field {field!r} must be a string, got {type(v).__name__}")
+        if len(v) > _MAX_STR_FIELD_LEN:
+            raise ValueError(f"job field {field!r} too long ({len(v)} > {_MAX_STR_FIELD_LEN})")
+        if any(ord(c) < 0x20 or ord(c) == 0x7F for c in v):
+            raise ValueError(f"job field {field!r} contains control characters")
+
+
 def load_job() -> Dict[str, Any]:
     with open(JOB_PATH, "r", encoding="utf-8") as fh:
         job = json.load(fh)
@@ -87,6 +109,7 @@ def load_job() -> Dict[str, Any]:
         raise ValueError(f"unsupported schema_version {job.get('schema_version')!r}")
     if job.get("task") != "em_simulation":
         raise ValueError(f"unsupported task {job.get('task')!r}")
+    _validate_job_strings(job)
     return job
 
 
@@ -212,7 +235,8 @@ def main() -> None:
         # a "solver" marker ("analytic" vs the real engine name); we append
         # "+analytic" so QA / aggregation can distinguish a real FDTD solve from
         # the deterministic placeholder (architecture doc §3.2).
-        engine_version = job.get("engine_version") or f"{engine_name}-unknown"
+        requested_engine_version = job.get("engine_version")
+        engine_version = requested_engine_version or f"{engine_name}-unknown"
         if vectors.get("solver") == "analytic" and "+analytic" not in engine_version:
             engine_version = f"{engine_version}+analytic"
 
@@ -234,6 +258,12 @@ def main() -> None:
             "converged": bool(vectors.get("converged", False)),
             "engine": engine_name,
             "engine_version": engine_version,
+            # Authoritative, engine-set provenance the buyer cannot forge: the
+            # solver that actually ran ("gprmax"/"meep"/"openems"/"analytic").
+            # engine_version mirrors the (hub-set) requested version, with
+            # "+analytic" appended whenever the real engine was unavailable.
+            "solver": vectors.get("solver"),
+            "requested_engine_version": requested_engine_version,
             "mesh_cells": int(vectors.get("mesh_cells", 0)),
             "duration_ms": duration_ms,
         }

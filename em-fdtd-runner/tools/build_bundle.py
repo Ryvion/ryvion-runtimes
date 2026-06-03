@@ -152,30 +152,35 @@ def entrypoint_for(os_name: str) -> List[str]:
 def sign_manifest(manifest_bytes: bytes, key_path: Optional[str]) -> str:
     """Ed25519-sign the canonical manifest bytes. Returns 'ed25519:<hex>'.
 
-    The key file holds a 32-byte raw seed (hex or binary). When cryptography /
-    PyNaCl is unavailable OR no key is given, returns 'ed25519:UNSIGNED'.
+    The key file holds a 32-byte raw seed (hex or binary). When NO key is given,
+    returns 'ed25519:UNSIGNED'. When a key IS given but no Ed25519 backend can
+    sign (or the seed is invalid), RAISES — it never silently emits an UNSIGNED
+    manifest the operator believes is signed.
     """
     if not key_path:
         return "ed25519:UNSIGNED"
     seed = _load_seed(key_path)
+    errors: List[str] = []
     try:
         from cryptography.hazmat.primitives.asymmetric.ed25519 import (  # type: ignore
             Ed25519PrivateKey,
         )
 
         sk = Ed25519PrivateKey.from_private_bytes(seed)
-        sig = sk.sign(manifest_bytes)
-        return "ed25519:" + sig.hex()
-    except Exception:
-        pass
+        return "ed25519:" + sk.sign(manifest_bytes).hex()
+    except Exception as exc:  # noqa: BLE001
+        errors.append(f"cryptography: {exc}")
     try:
         import nacl.signing  # type: ignore
 
         sk = nacl.signing.SigningKey(seed)
-        sig = sk.sign(manifest_bytes).signature
-        return "ed25519:" + sig.hex()
-    except Exception:
-        return "ed25519:UNSIGNED"
+        return "ed25519:" + sk.sign(manifest_bytes).signature.hex()
+    except Exception as exc:  # noqa: BLE001
+        errors.append(f"pynacl: {exc}")
+    raise RuntimeError(
+        "signing key provided but could not sign (install `cryptography` or "
+        "`pynacl`, and check the seed): " + "; ".join(errors)
+    )
 
 
 def _load_seed(key_path: str) -> bytes:
@@ -229,7 +234,56 @@ def canonical_manifest_bytes(manifest: Dict[str, object]) -> bytes:
     return json.dumps(unsigned, sort_keys=True, separators=(",", ":")).encode("utf-8")
 
 
+def _genkey(argv: List[str]) -> int:
+    """Generate an Ed25519 EM-bundle signing keypair.
+
+    Writes the PRIVATE seed (hex) to a 0600 file (store it as a secret, never
+    commit), and PRINTS the PUBLIC key — pin it as emBundlePinnedSigningKeyB64 in
+    ryvion-node (or set RYV_EM_BUNDLE_PUBKEY).
+    """
+    import base64
+
+    ap = argparse.ArgumentParser(description="Generate an Ed25519 EM-bundle signing keypair.")
+    ap.add_argument("--genkey", action="store_true")
+    ap.add_argument("--key-out", default="em_bundle_ed25519.key",
+                    help="path to write the PRIVATE seed (hex); default ./em_bundle_ed25519.key")
+    args = ap.parse_args(argv)
+
+    seed = pub = None
+    try:
+        from cryptography.hazmat.primitives import serialization  # type: ignore
+        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey  # type: ignore
+
+        sk = Ed25519PrivateKey.generate()
+        seed = sk.private_bytes(serialization.Encoding.Raw, serialization.PrivateFormat.Raw,
+                                serialization.NoEncryption())
+        pub = sk.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+    except Exception:
+        try:
+            import nacl.signing  # type: ignore
+
+            sk = nacl.signing.SigningKey.generate()
+            seed = bytes(sk)
+            pub = bytes(sk.verify_key)
+        except Exception as exc:  # noqa: BLE001
+            sys.stderr.write(f"ERROR: need `cryptography` or `pynacl` to generate a key: {exc}\n")
+            return 2
+
+    fd = os.open(args.key_out, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as fh:
+        fh.write(seed.hex() + "\n")
+
+    print("Ed25519 EM-bundle signing keypair generated.")
+    print(f"  PRIVATE seed -> {args.key_out}  (chmod 600 — store as a SECRET, never commit)")
+    print(f"  PUBLIC (base64, pin as emBundlePinnedSigningKeyB64): {base64.standard_b64encode(pub).decode()}")
+    print(f"  PUBLIC (hex, or set RYV_EM_BUNDLE_PUBKEY):           {pub.hex()}")
+    return 0
+
+
 def main(argv: Optional[List[str]] = None) -> int:
+    argv = list(sys.argv[1:]) if argv is None else list(argv)
+    if "--genkey" in argv:
+        return _genkey(argv)
     ap = argparse.ArgumentParser(description="Build a Ryvion EM native bundle (em.bundle.v1).")
     ap.add_argument("--engine", required=True, choices=VALID_ENGINES)
     ap.add_argument("--engine-version", required=True)
@@ -275,7 +329,11 @@ def main(argv: Optional[List[str]] = None) -> int:
     size_bytes = total_size(bundle_dir)
     manifest = build_manifest(args, digests, size_bytes)
 
-    sig = sign_manifest(canonical_manifest_bytes(manifest), args.signing_key or None)
+    try:
+        sig = sign_manifest(canonical_manifest_bytes(manifest), args.signing_key or None)
+    except Exception as exc:  # noqa: BLE001
+        sys.stderr.write(f"ERROR: manifest signing failed: {exc}\n")
+        return 2
     manifest["signature"] = sig
 
     with open(os.path.join(bundle_dir, "manifest.json"), "w", encoding="utf-8") as fh:

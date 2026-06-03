@@ -8,10 +8,12 @@ Ed25519 signature over the canonical manifest bytes. Mirrors build_bundle.py so
 the two stay in lockstep; also used by the unit tests.
 
 Usage:
-  python tools/verify_bundle.py <bundle_dir> [--public-key <ed25519 pubkey file>]
+  python tools/verify_bundle.py <bundle_dir> --public-key <ed25519 pubkey file>
+  python tools/verify_bundle.py <bundle_dir> --allow-unsigned   # dev/CI: hashes only
 
-Exit 0 on success; non-zero with a diagnostic on any mismatch. An UNSIGNED
-manifest is reported but not fatal unless --require-signature is given.
+Exit 0 on success; non-zero with a diagnostic on any mismatch. Fail-closed: a
+valid signature is REQUIRED by default (provide --public-key); pass
+--allow-unsigned to verify only the file hashes (dev / CI skeletons).
 """
 from __future__ import annotations
 
@@ -63,7 +65,9 @@ def verify_signature(manifest: Dict[str, object], pubkey_path: Optional[str]) ->
     if sig.endswith("UNSIGNED") or sig.endswith("PENDING"):
         return (False, "manifest is unsigned")
     if not pubkey_path:
-        return (True, "signature present (not checked: no public key given)")
+        # Fail-closed: a signature we cannot verify is NOT a pass. Callers that
+        # don't require a signature simply ignore this result.
+        return (False, "signature present but not verified: no public key given")
     if not sig.startswith("ed25519:"):
         return (False, f"unknown signature scheme: {sig.split(':', 1)[0]}")
     sig_bytes = bytes.fromhex(sig.split(":", 1)[1])
@@ -138,10 +142,14 @@ def main(argv: Optional[List[str]] = None) -> int:
     ap = argparse.ArgumentParser(description="Verify a Ryvion EM native bundle.")
     ap.add_argument("bundle_dir")
     ap.add_argument("--public-key", default="")
-    ap.add_argument("--require-signature", action="store_true")
+    # Fail-closed by default: the CLI requires a valid signature. Pass
+    # --allow-unsigned to verify only the file hashes (dev / CI skeletons).
+    ap.add_argument("--allow-unsigned", action="store_true",
+                    help="permit an unsigned/unverifiable bundle (dev/CI only)")
     args = ap.parse_args(argv)
 
-    problems = verify_bundle(args.bundle_dir, args.public_key or None, args.require_signature)
+    problems = verify_bundle(args.bundle_dir, args.public_key or None,
+                             require_signature=not args.allow_unsigned)
     if problems:
         sys.stderr.write("BUNDLE INVALID:\n" + "\n".join(f"  - {p}" for p in problems) + "\n")
         return 1
